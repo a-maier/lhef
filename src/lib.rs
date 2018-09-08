@@ -368,4 +368,14 @@ mod tests {
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
     }
+
+    #[test]
+    fn read_hejfog() {
+        let file = File::open("test_data/HEJFOG.lhe.gz").expect("file not found");
+        let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
+        let mut lhef = LesHouchesReader::new(reader).unwrap();
+        let mut nevents = 0;
+        while let Ok(Some(_)) = lhef.event() { nevents += 1 };
+        assert_eq!(nevents, 10);
+    }
 }
