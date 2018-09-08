@@ -13,116 +13,6 @@ const EVENT_START: &'static str = "<event>";
 const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
-#[derive(Debug)]
-enum ParseError {
-    BadFirstLine(String),
-    BadHeaderStart(String),
-    BadEventStart(String),
-    MissingEntry(String),
-    ConversionError(String),
-    UnsupportedVersion(String),
-    MissingVersion,
-    EndOfFile(&'static str),
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use ParseError::*;
-        match *self {
-            BadFirstLine(ref line) => {
-                write!(
-                    f,
-                    "First line '{}' in input does start with '{}'",
-                    line, LHEF_TAG_OPEN
-                )
-            },
-            BadHeaderStart(ref line) => {
-                write!(
-                    f,
-                    "Encountered unrecognized line '{}', \
-                     expected a header starting with '{}', '{}', \
-                     or the init block starting with '{}'",
-                    line, COMMENT_START, HEADER_START, INIT_START
-                )
-            },
-            BadEventStart(ref line) => {
-                write!(
-                    f,
-                    "Encountered unrecognized line '{}', \
-                     expected an event starting with '{}'",
-                    line, EVENT_START
-                )
-            },
-            UnsupportedVersion(ref version) => {
-                write!(
-                    f,
-                    "Unsupported version {}, only 1.0, 2.0, 3.0 are supported",
-                    version
-                )
-            },
-            MissingVersion => {
-                write!(f, "Version information missing")
-            }
-            MissingEntry(ref entry) => {
-                write!(f, "Missing entry '{}'", entry)
-            },
-            ConversionError(ref entry) => {
-                write!(f, "Failed to convert to number: '{}'", entry)
-            },
-            EndOfFile(ref block) => {
-                write!(f, "Encountered '{}' block without closing tag", block)
-            }
-        }
-    }
-}
-
-// TODO
-impl error::Error for ParseError {
-    fn description(&self) -> &str {
-        ""
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
-}
-
-#[allow(non_snake_case)]
-#[derive(PartialEq,Debug,Clone)]
-pub struct HEPRUP {
-    IDBMUP: [i32; 2],
-    EBMUP: [f64; 2],
-    PDFGUP: [i32; 2],
-    PDFSUP: [i32; 2],
-    IDWTUP: i32,
-    NPRUP: i32,
-    XSECUP: Vec<f64>,
-    XERRUP: Vec<f64>,
-    XMAXUP: Vec<f64>,
-    LPRUP: Vec<i32>,
-    info: String,
-}
-
-#[allow(non_snake_case)]
-#[derive(PartialEq,Debug,Clone)]
-pub struct HEPEUP{
-    NUP: i32,
-    IDRUP: i32,
-    XWGTUP: f64,
-    SCALUP: f64,
-    AQEDUP: f64,
-    AQCDUP: f64,
-    IDUP: Vec<i32>,
-    ISTUP: Vec<i32>,
-    MOTHUP: Vec<[i32; 2]>,
-    ICOLUP: Vec<[i32; 2]>,
-    PUP: Vec<[f64; 5]>,
-    VTIMUP: Vec<f64>,
-    SPINUP: Vec<f64>,
-    info: String,
-}
-
 pub struct LesHouchesReader<Stream> {
     stream: Stream,
     header: String, // TODO: or some xml struct?
@@ -360,6 +250,116 @@ fn parse_event<Stream: BufRead>(
         IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP,
         info
     })
+}
+
+#[allow(non_snake_case)]
+#[derive(PartialEq,Debug,Clone)]
+pub struct HEPRUP {
+    IDBMUP: [i32; 2],
+    EBMUP: [f64; 2],
+    PDFGUP: [i32; 2],
+    PDFSUP: [i32; 2],
+    IDWTUP: i32,
+    NPRUP: i32,
+    XSECUP: Vec<f64>,
+    XERRUP: Vec<f64>,
+    XMAXUP: Vec<f64>,
+    LPRUP: Vec<i32>,
+    info: String,
+}
+
+#[allow(non_snake_case)]
+#[derive(PartialEq,Debug,Clone)]
+pub struct HEPEUP{
+    NUP: i32,
+    IDRUP: i32,
+    XWGTUP: f64,
+    SCALUP: f64,
+    AQEDUP: f64,
+    AQCDUP: f64,
+    IDUP: Vec<i32>,
+    ISTUP: Vec<i32>,
+    MOTHUP: Vec<[i32; 2]>,
+    ICOLUP: Vec<[i32; 2]>,
+    PUP: Vec<[f64; 5]>,
+    VTIMUP: Vec<f64>,
+    SPINUP: Vec<f64>,
+    info: String,
+}
+
+#[derive(Debug)]
+enum ParseError {
+    BadFirstLine(String),
+    BadHeaderStart(String),
+    BadEventStart(String),
+    MissingEntry(String),
+    ConversionError(String),
+    UnsupportedVersion(String),
+    MissingVersion,
+    EndOfFile(&'static str),
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use ParseError::*;
+        match *self {
+            BadFirstLine(ref line) => {
+                write!(
+                    f,
+                    "First line '{}' in input does start with '{}'",
+                    line, LHEF_TAG_OPEN
+                )
+            },
+            BadHeaderStart(ref line) => {
+                write!(
+                    f,
+                    "Encountered unrecognized line '{}', \
+                     expected a header starting with '{}', '{}', \
+                     or the init block starting with '{}'",
+                    line, COMMENT_START, HEADER_START, INIT_START
+                )
+            },
+            BadEventStart(ref line) => {
+                write!(
+                    f,
+                    "Encountered unrecognized line '{}', \
+                     expected an event starting with '{}'",
+                    line, EVENT_START
+                )
+            },
+            UnsupportedVersion(ref version) => {
+                write!(
+                    f,
+                    "Unsupported version {}, only 1.0, 2.0, 3.0 are supported",
+                    version
+                )
+            },
+            MissingVersion => {
+                write!(f, "Version information missing")
+            }
+            MissingEntry(ref entry) => {
+                write!(f, "Missing entry '{}'", entry)
+            },
+            ConversionError(ref entry) => {
+                write!(f, "Failed to convert to number: '{}'", entry)
+            },
+            EndOfFile(ref block) => {
+                write!(f, "Encountered '{}' block without closing tag", block)
+            }
+        }
+    }
+}
+
+// TODO
+impl error::Error for ParseError {
+    fn description(&self) -> &str {
+        ""
+    }
+
+    fn cause(&self) -> Option<&error::Error> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
 }
 
 #[cfg(test)]
