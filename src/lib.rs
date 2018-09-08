@@ -16,18 +16,18 @@ const EVENT_START: &'static str = "<event>";
 const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
-pub struct LesHouchesReader<Stream> {
+pub struct Reader<Stream> {
     stream: Stream,
     header: String, // TODO: or some xml struct?
     heprup: HEPRUP,
 }
 
-impl<Stream: BufRead> LesHouchesReader<Stream> {
-    pub fn new(mut stream: Stream) -> Result<LesHouchesReader<Stream>, Box<error::Error>> {
+impl<Stream: BufRead> Reader<Stream> {
+    pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
         check_first_line(&mut stream)?;
         let header = parse_header(&mut stream)?;
         let heprup = parse_init(&mut stream)?;
-        Ok(LesHouchesReader{stream, header, heprup})
+        Ok(Reader{stream, header, heprup})
     }
 
     pub fn header(&self) -> &str {
@@ -380,7 +380,7 @@ mod tests {
     fn read_correct() {
         let file = File::open("test_data/2j.lhe.gz").expect("file not found");
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
-        let mut lhef = LesHouchesReader::new(reader).unwrap();
+        let mut lhef = Reader::new(reader).unwrap();
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
@@ -390,7 +390,7 @@ mod tests {
     fn read_hejfog() {
         let file = File::open("test_data/HEJFOG.lhe.gz").expect("file not found");
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
-        let mut lhef = LesHouchesReader::new(reader).unwrap();
+        let mut lhef = Reader::new(reader).unwrap();
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 10);
