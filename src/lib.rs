@@ -1,3 +1,6 @@
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
 use std::io::BufRead;
 use std::fmt;
 use std::error;
@@ -253,6 +256,7 @@ fn parse_event<Stream: BufRead>(
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPRUP {
     IDBMUP: [i32; 2],
@@ -269,6 +273,7 @@ pub struct HEPRUP {
 }
 
 #[allow(non_snake_case)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPEUP{
     NUP: i32,
