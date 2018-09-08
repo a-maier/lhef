@@ -21,7 +21,8 @@ enum ParseError {
     MissingEntry(String),
     ConversionError(String),
     UnsupportedVersion(String),
-    MissingVersion
+    MissingVersion,
+    EndOfFile(&'static str),
 }
 
 impl fmt::Display for ParseError {
@@ -68,6 +69,9 @@ impl fmt::Display for ParseError {
             ConversionError(ref entry) => {
                 write!(f, "Failed to convert to number: '{}'", entry)
             },
+            EndOfFile(ref block) => {
+                write!(f, "Encountered '{}' block without closing tag", block)
+            }
         }
     }
 }
@@ -207,10 +211,12 @@ fn parse_comment_header<Stream: BufRead>(
     stream: &mut Stream, header: &mut String
 ) -> Result<(), Box<error::Error>> {
     loop {
-        stream.read_line(header)?;
+        if stream.read_line(header)? == 0 {
+            return Err(Box::new(ParseError::EndOfFile("header")));
+        }
         if header.lines().last().unwrap().trim() == COMMENT_END {
             return Ok(())
-        };
+        }
     }
 }
 
@@ -219,7 +225,9 @@ fn parse_structured_header<Stream: BufRead>(
     stream: &mut Stream, header: &mut String
 ) -> Result<(), Box<error::Error>> {
     loop {
-        stream.read_line(header)?;
+        if stream.read_line(header)? == 0 {
+            return Err(Box::new(ParseError::EndOfFile("header")));
+        }
         if header.lines().last().unwrap().trim() == HEADER_END {
             return Ok(())
         };
@@ -277,7 +285,9 @@ fn parse_init<Stream: BufRead>(
     }
     let mut info = String::new();
     loop {
-        stream.read_line(&mut info)?;
+        if stream.read_line(&mut info)? == 0 {
+            return Err(Box::new(ParseError::EndOfFile("init")));
+        }
         if info.lines().last().unwrap() == INIT_END {
             pop_line(&mut info);
             break;
@@ -337,7 +347,9 @@ fn parse_event<Stream: BufRead>(
     }
     let mut info = String::new();
     loop {
-        stream.read_line(&mut info)?;
+        if stream.read_line(&mut info)? == 0 {
+            return Err(Box::new(ParseError::EndOfFile("event")));
+        }
         if info.lines().last().unwrap().trim() == EVENT_END {
             pop_line(&mut info);
             break;
