@@ -16,6 +16,7 @@ const EVENT_START: &'static str = "<event>";
 const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
+/// Reader for the LHEF format
 pub struct Reader<Stream> {
     stream: Stream,
     header: String, // TODO: or some xml struct?
@@ -23,6 +24,15 @@ pub struct Reader<Stream> {
 }
 
 impl<Stream: BufRead> Reader<Stream> {
+    /// Create a new LHEF reader
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// let file = std::fs::File::open("events.lhe");
+    /// let file = std::io::BufReader::new(file);
+    /// let reader = lhef::Reader::new(file);
+    /// ```
     pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
         check_first_line(&mut stream)?;
         let header = parse_header(&mut stream)?;
@@ -30,14 +40,27 @@ impl<Stream: BufRead> Reader<Stream> {
         Ok(Reader{stream, header, heprup})
     }
 
+    /// Get the LHEF header
     pub fn header(&self) -> &str {
         &self.header
     }
 
+    /// Get the LHEF run information
     pub fn heprup(&self) -> &HEPRUP {
         &self.heprup
     }
 
+    /// Get the next event
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// let event = reader.event()?;
+    /// match event {
+    ///    Some(event) => println!("Found an event."),
+    ///    None => println!("Reached end of event file."),
+    /// }
+    /// ```
     pub fn event(&mut self) -> Result<Option<HEPEUP>, Box<error::Error>> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
@@ -255,40 +278,71 @@ fn parse_event<Stream: BufRead>(
     })
 }
 
+/// Generator run information
+///
+/// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPRUP {
+    /// Beam IDs
     IDBMUP: [i32; 2],
+    /// Beam energies
     EBMUP: [f64; 2],
+    /// PDF groups
     PDFGUP: [i32; 2],
+    /// PDF set IDs
     PDFSUP: [i32; 2],
+    /// Event weight specification
     IDWTUP: i32,
+    /// Number of subprocesses
     NPRUP: i32,
+    /// Subprocess cross sections
     XSECUP: Vec<f64>,
+    /// Subprocess cross section errors
     XERRUP: Vec<f64>,
+    /// Subprocess maximum weights
     XMAXUP: Vec<f64>,
+    /// Process IDs
     LPRUP: Vec<i32>,
+    /// Optional run information
     info: String,
 }
 
+/// Event information
+///
+/// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPEUP{
+    /// Number of particles
     NUP: i32,
+    /// Process ID
     IDRUP: i32,
+    /// Event weight
     XWGTUP: f64,
+    /// Scale in GeV
     SCALUP: f64,
+    /// Value of the QED coupling α
     AQEDUP: f64,
+    /// Value of the QCD coupling α_s
     AQCDUP: f64,
+    /// Particle IDs
     IDUP: Vec<i32>,
+    /// Particle status
     ISTUP: Vec<i32>,
+    /// Indices of decay mothers
     MOTHUP: Vec<[i32; 2]>,
+    /// Colour flow
     ICOLUP: Vec<[i32; 2]>,
+    /// Particle momentum in GeV
     PUP: Vec<[f64; 5]>,
+    /// Lifetime in mm
     VTIMUP: Vec<f64>,
+    /// Spin angle
     SPINUP: Vec<f64>,
+    /// Optional event information
     info: String,
 }
 
