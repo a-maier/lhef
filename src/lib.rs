@@ -286,27 +286,27 @@ fn parse_event<Stream: BufRead>(
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPRUP {
     /// Beam IDs
-    IDBMUP: [i32; 2],
+    pub IDBMUP: [i32; 2],
     /// Beam energies
-    EBMUP: [f64; 2],
+    pub EBMUP: [f64; 2],
     /// PDF groups
-    PDFGUP: [i32; 2],
+    pub PDFGUP: [i32; 2],
     /// PDF set IDs
-    PDFSUP: [i32; 2],
+    pub PDFSUP: [i32; 2],
     /// Event weight specification
-    IDWTUP: i32,
+    pub IDWTUP: i32,
     /// Number of subprocesses
-    NPRUP: i32,
+    pub NPRUP: i32,
     /// Subprocess cross sections
-    XSECUP: Vec<f64>,
+    pub XSECUP: Vec<f64>,
     /// Subprocess cross section errors
-    XERRUP: Vec<f64>,
+    pub XERRUP: Vec<f64>,
     /// Subprocess maximum weights
-    XMAXUP: Vec<f64>,
+    pub XMAXUP: Vec<f64>,
     /// Process IDs
-    LPRUP: Vec<i32>,
+    pub LPRUP: Vec<i32>,
     /// Optional run information
-    info: String,
+    pub info: String,
 }
 
 /// Event information
@@ -317,33 +317,33 @@ pub struct HEPRUP {
 #[derive(PartialEq,Debug,Clone)]
 pub struct HEPEUP{
     /// Number of particles
-    NUP: i32,
+    pub NUP: i32,
     /// Process ID
-    IDRUP: i32,
+    pub IDRUP: i32,
     /// Event weight
-    XWGTUP: f64,
+    pub XWGTUP: f64,
     /// Scale in GeV
-    SCALUP: f64,
+    pub SCALUP: f64,
     /// Value of the QED coupling α
-    AQEDUP: f64,
+    pub AQEDUP: f64,
     /// Value of the QCD coupling α_s
-    AQCDUP: f64,
+    pub AQCDUP: f64,
     /// Particle IDs
-    IDUP: Vec<i32>,
+    pub IDUP: Vec<i32>,
     /// Particle status
-    ISTUP: Vec<i32>,
+    pub ISTUP: Vec<i32>,
     /// Indices of decay mothers
-    MOTHUP: Vec<[i32; 2]>,
+    pub MOTHUP: Vec<[i32; 2]>,
     /// Colour flow
-    ICOLUP: Vec<[i32; 2]>,
+    pub ICOLUP: Vec<[i32; 2]>,
     /// Particle momentum in GeV
-    PUP: Vec<[f64; 5]>,
+    pub PUP: Vec<[f64; 5]>,
     /// Lifetime in mm
-    VTIMUP: Vec<f64>,
+    pub VTIMUP: Vec<f64>,
     /// Spin angle
-    SPINUP: Vec<f64>,
+    pub SPINUP: Vec<f64>,
     /// Optional event information
-    info: String,
+    pub info: String,
 }
 
 #[derive(Debug)]
