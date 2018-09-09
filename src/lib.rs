@@ -19,6 +19,7 @@ const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 /// Reader for the LHEF format
 pub struct Reader<Stream> {
     stream: Stream,
+    version: &'static str,
     header: String, // TODO: or some xml struct?
     heprup: HEPRUP,
 }
@@ -34,10 +35,15 @@ impl<Stream: BufRead> Reader<Stream> {
     /// let reader = lhef::Reader::new(file);
     /// ```
     pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
-        check_first_line(&mut stream)?;
+        let version = parse_version(&mut stream)?;
         let header = parse_header(&mut stream)?;
         let heprup = parse_init(&mut stream)?;
-        Ok(Reader{stream, header, heprup})
+        Ok(Reader{stream, version, header, heprup})
+    }
+
+    /// Get the LHEF version
+    pub fn version(&self) -> &str {
+        &self.version
     }
 
     /// Get the LHEF header
@@ -72,7 +78,7 @@ impl<Stream: BufRead> Reader<Stream> {
     }
 }
 
-fn check_first_line<Stream: BufRead>(stream: &mut Stream) -> Result<(), Box<error::Error>> {
+fn parse_version<Stream: BufRead>(stream: &mut Stream) -> Result<&'static str, Box<error::Error>> {
     use ParseError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
@@ -80,22 +86,22 @@ fn check_first_line<Stream: BufRead>(stream: &mut Stream) -> Result<(), Box<erro
     let mut line_entries = first_line.trim().split('"');
     if line_entries.next() != Some(LHEF_TAG_OPEN) {
         return Err(Box::new(ParseError::BadFirstLine(line_cp)))
-    }
-    match line_entries.next() {
-        Some("1.0") => {},
-        Some("2.0") => {},
-        Some("3.0") => {},
+    };
+    let version = match line_entries.next() {
+        Some("1.0") => {"1.0"},
+        Some("2.0") => {"2.0"},
+        Some("3.0") => {"3.0"},
         Some(version) => {
             return Err(Box::new(UnsupportedVersion(version.to_string())))
         }
         None => {
             return Err(Box::new(MissingVersion))
         }
-    }
+    };
     if line_entries.next() != Some(">") {
         return Err(Box::new(ParseError::BadFirstLine(line_cp)))
-    }
-    Ok(())
+    };
+    Ok(version)
 }
 
 fn parse_header<Stream: BufRead>(mut stream: &mut Stream) -> Result<String, Box<error::Error>> {
@@ -435,6 +441,7 @@ mod tests {
         let file = File::open("test_data/2j.lhe.gz").expect("file not found");
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
         let mut lhef = Reader::new(reader).unwrap();
+        assert_eq!(lhef.version(), "3.0");
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
