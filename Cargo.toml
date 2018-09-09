@@ -2,7 +2,12 @@
 name = "lhef"
 version = "0.1.0"
 authors = ["Andreas Maier <andreas.maier@durham.ac.uk>"]
+description = "Read files in the Les Houches Event File format"
 readme = "Readme.md"
+license = "GPL-3.0-or-later"
+keywords = ["physics", "parser"]
+categories = ["science", "parser-implementations"]
+repository = "https://github.com/a-maier/lhef"
 
 [dependencies]
 serde = { version = "1.0", optional = true, features = ["derive"] }
