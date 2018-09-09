@@ -30,9 +30,9 @@ impl<Stream: BufRead> Reader<Stream> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// let file = std::fs::File::open("events.lhe");
+    /// let file = std::fs::File::open("events.lhe").unwrap();
     /// let file = std::io::BufReader::new(file);
-    /// let reader = lhef::Reader::new(file);
+    /// let reader = lhef::Reader::new(file).unwrap();
     /// ```
     pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
         let version = parse_version(&mut stream)?;
@@ -61,7 +61,11 @@ impl<Stream: BufRead> Reader<Stream> {
     /// # Example
     ///
     /// ```rust,no_run
-    /// let event = reader.event()?;
+    /// let file = std::fs::File::open("events.lhe").unwrap();
+    /// let file = std::io::BufReader::new(file);
+    /// let mut reader = lhef::Reader::new(file).unwrap();
+    ///
+    /// let event = reader.event().unwrap();
     /// match event {
     ///    Some(event) => println!("Found an event."),
     ///    None => println!("Reached end of event file."),
