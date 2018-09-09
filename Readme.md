@@ -5,14 +5,13 @@ A library for interacting with files in the Les Houches Event File (LHEF) format
 Currently, lhef only supports reading via the `Reader`
 struct. Information about the generator run is provided in a `HEPRUP`
 object and each event is stored in a `HEPEUP` object. These structs
-correspond to the Fortan common blocks of the same names in the [original proposal] (https://arxiv.org/abs/hep-ph/0109068v1), but
+correspond to the Fortan common blocks of the same names in the [original proposal](https://arxiv.org/abs/hep-ph/0109068v1), but
 contain extra `info` fields corresponding to the "optional information"
 specified in the LHEF standard.
 
-As of now, only [version 1.0] (https://arxiv.org/abs/hep-ph/0609017) of the LHEF format</a> is fully supported. Files in [version
-2.0]
-(http://www.lpthe.jussieu.fr/LesHouches09Wiki/index.php/LHEF_for_Matching
-and [3.0] (https://phystev.cnrs.fr/wiki/2013:groups:tools:lhef3) are
+As of now, only [version 1.0](https://arxiv.org/abs/hep-ph/0609017) of
+the LHEF format</a> is fully supported. Files in [version 2.0](http://www.lpthe.jussieu.fr/LesHouches09Wiki/index.php/LHEF_for_Matching)
+and [3.0](https://phystev.cnrs.fr/wiki/2013:groups:tools:lhef3) are
 parsed exactly like for version 1.0. This means that the additional XML
 tags have to be extracted manually from the `info` fields of the
 `HEPRUP` and `HEPEUP` objects.
