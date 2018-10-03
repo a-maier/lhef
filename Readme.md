@@ -5,7 +5,7 @@ A library for interacting with files in the Les Houches Event File (LHEF) format
 Currently, lhef only supports reading via the `Reader`
 struct. Information about the generator run is provided in a `HEPRUP`
 object and each event is stored in a `HEPEUP` object. These structs
-correspond to the Fortan common blocks of the same names in the [original proposal](https://arxiv.org/abs/hep-ph/0109068v1), but
+correspond to the Fortran common blocks of the same names in the [original proposal](https://arxiv.org/abs/hep-ph/0109068v1), but
 contain extra `info` fields corresponding to the "optional information"
 specified in the LHEF standard.
 
