@@ -11,4 +11,6 @@ repository = "https://github.com/a-maier/lhef"
 
 [dependencies]
 serde = { version = "1.0", optional = true, features = ["derive"] }
+
+[dev-dependencies]
 flate2 = "1.0"
