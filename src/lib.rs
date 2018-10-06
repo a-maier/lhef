@@ -1,3 +1,4 @@
+extern crate xmltree;
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
@@ -16,11 +17,14 @@ const EVENT_START: &'static str = "<event>";
 const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
+pub type XmlTree = xmltree::Element;
+
 /// Reader for the LHEF format
 pub struct Reader<Stream> {
     stream: Stream,
     version: &'static str,
-    header: String, // TODO: or some xml struct?
+    header: String,
+    xml_header: Option<XmlTree>,
     heprup: HEPRUP,
 }
 
@@ -36,9 +40,9 @@ impl<Stream: BufRead> Reader<Stream> {
     /// ```
     pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
         let version = parse_version(&mut stream)?;
-        let header = parse_header(&mut stream)?;
+        let (header, xml_header) = parse_header(&mut stream)?;
         let heprup = parse_init(&mut stream)?;
-        Ok(Reader{stream, version, header, heprup})
+        Ok(Reader{stream, version, header, xml_header, heprup})
     }
 
     /// Get the LHEF version
@@ -49,6 +53,11 @@ impl<Stream: BufRead> Reader<Stream> {
     /// Get the LHEF header
     pub fn header(&self) -> &str {
         &self.header
+    }
+
+    /// Get the LHEF header
+    pub fn xml_header(&self) -> &Option<XmlTree> {
+        &self.xml_header
     }
 
     /// Get the LHEF run information
@@ -108,20 +117,32 @@ fn parse_version<Stream: BufRead>(stream: &mut Stream) -> Result<&'static str, B
     Ok(version)
 }
 
-fn parse_header<Stream: BufRead>(mut stream: &mut Stream) -> Result<String, Box<error::Error>> {
+fn parse_header<Stream: BufRead>(mut stream: &mut Stream) ->
+    Result<(String, Option<XmlTree>), Box<error::Error>>
+{
     let mut header = String::new();
+    let mut xml_header = None;
     loop {
-        stream.read_line(&mut header)?;
-        match header.lines().last().unwrap().trim() {
-            COMMENT_START => parse_comment_header(&mut stream, &mut header)?,
-            HEADER_START => parse_structured_header(&mut stream, &mut header)?,
-            INIT_START => {
-                pop_line(&mut header);
-                return Ok(header)
+        let mut header_text = String::new();
+        stream.read_line(&mut header_text)?;
+        match header_text.trim() {
+            COMMENT_START => {
+                read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
+                header = header_text;
             },
-            _ => return Err(Box::new(ParseError::BadHeaderStart(
-                header.lines().last().unwrap().trim().to_owned()
-            ))),
+
+            HEADER_START => {
+                read_lines_until(&mut stream, &mut header_text, HEADER_END)?;
+                xml_header = Some(XmlTree::parse(header_text.as_bytes())?);
+            },
+            INIT_START => {
+                return Ok((header, xml_header))
+            },
+            _ => {
+                return Err(Box::new(ParseError::BadHeaderStart(
+                    header_text.trim().to_owned()
+                )))
+            },
         };
     }
 }
@@ -133,30 +154,16 @@ fn pop_line(s: &mut String) {
     }
 }
 
-fn parse_comment_header<Stream: BufRead>(
-    stream: &mut Stream, header: &mut String
+fn read_lines_until<Stream: BufRead>(
+    stream: &mut Stream, header: &mut String, header_end: &str
 ) -> Result<(), Box<error::Error>> {
     loop {
         if stream.read_line(header)? == 0 {
             return Err(Box::new(ParseError::EndOfFile("header")));
         }
-        if header.lines().last().unwrap().trim() == COMMENT_END {
+        if header.lines().last().unwrap().trim() == header_end {
             return Ok(())
         }
-    }
-}
-
-//TODO: parse as xml
-fn parse_structured_header<Stream: BufRead>(
-    stream: &mut Stream, header: &mut String
-) -> Result<(), Box<error::Error>> {
-    loop {
-        if stream.read_line(header)? == 0 {
-            return Err(Box::new(ParseError::EndOfFile("header")));
-        }
-        if header.lines().last().unwrap().trim() == HEADER_END {
-            return Ok(())
-        };
     }
 }
 
@@ -446,6 +453,12 @@ mod tests {
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
         let mut lhef = Reader::new(reader).unwrap();
         assert_eq!(lhef.version(), "3.0");
+        {
+            let header = lhef.xml_header().as_ref().unwrap();
+            let MG_version_entry = &header.children[0];
+            assert_eq!(MG_version_entry.name, "MGVersion");
+            assert_eq!(MG_version_entry.text.as_ref().unwrap(), "\n#5.2.3.3\n");
+        }
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
