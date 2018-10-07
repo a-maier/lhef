@@ -5,13 +5,14 @@ extern crate serde;
 use std::io::BufRead;
 use std::fmt;
 use std::error;
+use std::collections::HashMap;
 
 const LHEF_TAG_OPEN: &'static str = "<LesHouchesEvents version=";
 const COMMENT_START: &'static str = "<!--";
 const COMMENT_END: &'static str = "-->";
-const HEADER_START: &'static str = "<header>";
+const HEADER_START: &'static str = "<header";
 const HEADER_END: &'static str = "</header>";
-const INIT_START: &'static str = "<init>";
+const INIT_START: &'static str = "<init";
 const INIT_END: &'static str = "</init>";
 const EVENT_START: &'static str = "<event>";
 const EVENT_END: &'static str = "</event>";
@@ -40,8 +41,8 @@ impl<Stream: BufRead> Reader<Stream> {
     /// ```
     pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
         let version = parse_version(&mut stream)?;
-        let (header, xml_header) = parse_header(&mut stream)?;
-        let heprup = parse_init(&mut stream)?;
+        let (header, xml_header, init_start) = parse_header(&mut stream)?;
+        let heprup = parse_init(&init_start, &mut stream)?;
         Ok(Reader{stream, version, header, xml_header, heprup})
     }
 
@@ -118,32 +119,31 @@ fn parse_version<Stream: BufRead>(stream: &mut Stream) -> Result<&'static str, B
 }
 
 fn parse_header<Stream: BufRead>(mut stream: &mut Stream) ->
-    Result<(String, Option<XmlTree>), Box<error::Error>>
+    Result<(String, Option<XmlTree>, String), Box<error::Error>>
 {
+    use ParseError::BadHeaderStart;
     let mut header = String::new();
     let mut xml_header = None;
     loop {
         let mut header_text = String::new();
         stream.read_line(&mut header_text)?;
-        match header_text.trim() {
-            COMMENT_START => {
-                read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
-                header = header_text;
-            },
-
-            HEADER_START => {
-                read_lines_until(&mut stream, &mut header_text, HEADER_END)?;
-                xml_header = Some(XmlTree::parse(header_text.as_bytes())?);
-            },
-            INIT_START => {
-                return Ok((header, xml_header))
-            },
-            _ => {
-                return Err(Box::new(ParseError::BadHeaderStart(
-                    header_text.trim().to_owned()
-                )))
-            },
-        };
+        if header_text.trim_left().starts_with(COMMENT_START) {
+            if header_text.trim() != COMMENT_START {
+                return Err(Box::new(BadHeaderStart(header_text)))
+            }
+            read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
+            header = header_text;
+        }
+        else if header_text.trim_left().starts_with(HEADER_START) {
+            read_lines_until(&mut stream, &mut header_text, HEADER_END)?;
+            xml_header = Some(XmlTree::parse(header_text.as_bytes())?);
+        }
+        else if header_text.trim_left().starts_with(INIT_START) {
+            return Ok((header, xml_header, header_text))
+        }
+        else {
+            return Err(Box::new(ParseError::BadHeaderStart(header_text)))
+        }
     }
 }
 
@@ -177,11 +177,54 @@ where T: std::str::FromStr {
     }
 }
 
+// TODO: refactor
+fn extract_xml_attributes(orig_tag: &str) ->
+    Result<HashMap<String, String>, Box<error::Error>> {
+        use ParseError::BadXmlTag;
+        let tag = orig_tag.trim();
+        if tag.chars().last() != Some('>') {
+            return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
+        }
+        let len = tag.len();
+        let tag = &tag[..len-1];
+        let first_attr = tag.find(char::is_whitespace);
+        let tag = match first_attr {
+            None => return Ok(HashMap::new()),
+            Some(idx) => &tag[idx+1..],
+        };
+        let mut attributes = HashMap::new();
+        let mut tag = tag.trim_left();
+        loop {
+            let name_end = tag.find(|c: char| c.is_whitespace() || c == '=');
+            let name = match name_end {
+                None => return Ok(attributes),
+                Some(idx) => tag[..idx].to_owned(),
+            };
+            tag = tag[name.len()..].trim_left();
+            if tag.chars().next() != Some('=') {
+                return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
+            }
+            tag = tag[1..].trim_left();
+            let quote = tag.chars().next();
+            if quote != Some('\'') && quote != Some('"') {
+                return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
+            }
+            let quote = quote.unwrap();
+            tag = &tag[1..];
+            let value_end = tag.find(quote);
+            let value = match value_end {
+                Some(idx) => tag[..idx].to_owned(),
+                None => return Err(Box::new(BadXmlTag(orig_tag.to_owned()))),
+            };
+            tag = &tag[value.len()+1..].trim_left();
+            attributes.insert(name, value);
+        }
+}
+
 #[allow(non_snake_case)]
 fn parse_init<Stream: BufRead>(
-    stream: &mut Stream
+    init_open: &str, stream: &mut Stream
 ) -> Result<HEPRUP, Box<error::Error>> {
-    // we have already consumed to opening <init> when reading the header
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -226,10 +269,11 @@ fn parse_init<Stream: BufRead>(
             break;
         }
     }
+    let attributes = extract_xml_attributes(init_open)?;
     Ok(HEPRUP{
         IDBMUP, EBMUP, PDFGUP, PDFSUP, IDWTUP, NPRUP,
         XSECUP, XERRUP, XMAXUP, LPRUP,
-        info
+        info, attributes
     })
 }
 
@@ -324,6 +368,8 @@ pub struct HEPRUP {
     pub LPRUP: Vec<i32>,
     /// Optional run information
     pub info: String,
+    /// Attributes in <init> tag
+    pub attributes: HashMap<String, String>,
 }
 
 /// Event information
@@ -367,6 +413,7 @@ pub struct HEPEUP{
 enum ParseError {
     BadFirstLine(String),
     BadHeaderStart(String),
+    BadXmlTag(String),
     BadEventStart(String),
     MissingEntry(String),
     ConversionError(String),
@@ -393,6 +440,13 @@ impl fmt::Display for ParseError {
                      expected a header starting with '{}', '{}', \
                      or the init block starting with '{}'",
                     line, COMMENT_START, HEADER_START, INIT_START
+                )
+            },
+            BadXmlTag(ref line) => {
+                write!(
+                    f,
+                    "Encountered malformed xml tag: '{}'",
+                    line
                 )
             },
             BadEventStart(ref line) => {
@@ -455,10 +509,11 @@ mod tests {
         assert_eq!(lhef.version(), "3.0");
         {
             let header = lhef.xml_header().as_ref().unwrap();
-            let MG_version_entry = &header.children[0];
-            assert_eq!(MG_version_entry.name, "MGVersion");
-            assert_eq!(MG_version_entry.text.as_ref().unwrap(), "\n#5.2.3.3\n");
+            let mg_version_entry = &header.children[0];
+            assert_eq!(mg_version_entry.name, "MGVersion");
+            assert_eq!(mg_version_entry.text.as_ref().unwrap(), "\n#5.2.3.3\n");
         }
+        assert!(lhef.heprup().attributes.is_empty());
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
@@ -469,6 +524,10 @@ mod tests {
         let file = File::open("test_data/HEJFOG.lhe.gz").expect("file not found");
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
         let mut lhef = Reader::new(reader).unwrap();
+        {
+            let attr = lhef.heprup().attributes.get("testattribute");
+            assert_eq!(attr.unwrap().as_str(), "testvalue");
+        }
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 10);
