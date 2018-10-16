@@ -181,47 +181,52 @@ where T: std::str::FromStr {
     }
 }
 
+fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
+    use ParseError::BadXmlTag;
+    let tag = xml_tag.trim();
+    if tag.chars().last() != Some('>') {
+        return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
+    }
+    let len = tag.len();
+    let tag = &tag[..len-1];
+    let first_attr = tag.find(char::is_whitespace);
+    let tag = match first_attr {
+        None => return Ok(""),
+        Some(idx) => &tag[idx+1..],
+    };
+    Ok(tag.trim_left())
+}
+
 // TODO: refactor
-fn extract_xml_attributes(orig_tag: &str) ->
+fn extract_xml_attr(xml_tag: &str) ->
     Result<HashMap<String, String>, Box<error::Error>> {
         use ParseError::BadXmlTag;
-        let tag = orig_tag.trim();
-        if tag.chars().last() != Some('>') {
-            return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
-        }
-        let len = tag.len();
-        let tag = &tag[..len-1];
-        let first_attr = tag.find(char::is_whitespace);
-        let tag = match first_attr {
-            None => return Ok(HashMap::new()),
-            Some(idx) => &tag[idx+1..],
-        };
-        let mut attributes = HashMap::new();
-        let mut tag = tag.trim_left();
+        let mut tag = extract_xml_attr_str(xml_tag)?;
+        let mut attr = HashMap::new();
         loop {
             let name_end = tag.find(|c: char| c.is_whitespace() || c == '=');
             let name = match name_end {
-                None => return Ok(attributes),
+                None => return Ok(attr),
                 Some(idx) => tag[..idx].to_owned(),
             };
             tag = tag[name.len()..].trim_left();
             if tag.chars().next() != Some('=') {
-                return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
+                return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
             }
             tag = tag[1..].trim_left();
             let quote = tag.chars().next();
             if quote != Some('\'') && quote != Some('"') {
-                return Err(Box::new(BadXmlTag(orig_tag.to_owned())));
+                return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
             }
             let quote = quote.unwrap();
             tag = &tag[1..];
             let value_end = tag.find(quote);
             let value = match value_end {
                 Some(idx) => tag[..idx].to_owned(),
-                None => return Err(Box::new(BadXmlTag(orig_tag.to_owned()))),
+                None => return Err(Box::new(BadXmlTag(xml_tag.to_owned()))),
             };
             tag = &tag[value.len()+1..].trim_left();
-            attributes.insert(name, value);
+            attr.insert(name, value);
         }
 }
 
@@ -273,11 +278,11 @@ fn parse_init<Stream: BufRead>(
             break;
         }
     }
-    let attributes = extract_xml_attributes(init_open)?;
+    let attr = extract_xml_attr(init_open)?;
     Ok(HEPRUP{
         IDBMUP, EBMUP, PDFGUP, PDFSUP, IDWTUP, NPRUP,
         XSECUP, XERRUP, XMAXUP, LPRUP,
-        info, attributes
+        info, attr
     })
 }
 
@@ -335,11 +340,11 @@ fn parse_event<Stream: BufRead>(
             break;
         }
     }
-    let attributes = extract_xml_attributes(event_open)?;
+    let attr = extract_xml_attr(event_open)?;
     Ok(HEPEUP{
         NUP, IDRUP, XWGTUP, SCALUP, AQEDUP, AQCDUP,
         IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP,
-        info, attributes,
+        info, attr,
     })
 }
 
@@ -373,7 +378,7 @@ pub struct HEPRUP {
     /// Optional run information
     pub info: String,
     /// Attributes in <init> tag
-    pub attributes: HashMap<String, String>,
+    pub attr: HashMap<String, String>,
 }
 
 /// Event information
@@ -412,7 +417,7 @@ pub struct HEPEUP{
     /// Optional event information
     pub info: String,
     /// Attributes in <event> tag
-    pub attributes: HashMap<String, String>,
+    pub attr: HashMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -519,7 +524,7 @@ mod tests {
             assert_eq!(mg_version_entry.name, "MGVersion");
             assert_eq!(mg_version_entry.text.as_ref().unwrap(), "\n#5.2.3.3\n");
         }
-        assert!(lhef.heprup().attributes.is_empty());
+        assert!(lhef.heprup().attr.is_empty());
         let mut nevents = 0;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 1628);
@@ -531,17 +536,17 @@ mod tests {
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
         let mut lhef = Reader::new(reader).unwrap();
         {
-            let attr = lhef.heprup().attributes.get("testattribute");
+            let attr = lhef.heprup().attr.get("testattribute");
             assert_eq!(attr.unwrap().as_str(), "testvalue");
         }
         let first_event = lhef.event().unwrap().unwrap();
-        let expected_attributes = {
+        let expected_attr = {
             let mut hash = HashMap::new();
             hash.insert(String::from("attr0"), String::from("t0"));
             hash.insert(String::from("attr1"), String::from(""));
             hash
         };
-        assert_eq!(first_event.attributes, expected_attributes);
+        assert_eq!(first_event.attr, expected_attr);
         let mut nevents = 1;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 10);
