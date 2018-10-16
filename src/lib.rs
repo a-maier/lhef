@@ -14,7 +14,7 @@ const HEADER_START: &'static str = "<header";
 const HEADER_END: &'static str = "</header>";
 const INIT_START: &'static str = "<init";
 const INIT_END: &'static str = "</init>";
-const EVENT_START: &'static str = "<event>";
+const EVENT_START: &'static str = "<event";
 const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
@@ -84,10 +84,14 @@ impl<Stream: BufRead> Reader<Stream> {
     pub fn event(&mut self) -> Result<Option<HEPEUP>, Box<error::Error>> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
-        match line.trim() {
-            EVENT_START => Ok(Some(parse_event(&mut self.stream)?)),
-            LHEF_LAST_LINE => Ok(None),
-            _ => Err(Box::new(ParseError::BadEventStart(line)))
+        if line.starts_with(EVENT_START) {
+            Ok(Some(parse_event(&line, &mut self.stream)?))
+        }
+        else if line.trim() == LHEF_LAST_LINE {
+            Ok(None)
+        }
+        else {
+            Err(Box::new(ParseError::BadEventStart(line)))
         }
     }
 }
@@ -279,9 +283,8 @@ fn parse_init<Stream: BufRead>(
 
 #[allow(non_snake_case)]
 fn parse_event<Stream: BufRead>(
-    stream: &mut Stream
+    event_open: &str, stream: &mut Stream
 ) -> Result<HEPEUP, Box<error::Error>> {
-    // we have already consumed to opening <event>
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -332,10 +335,11 @@ fn parse_event<Stream: BufRead>(
             break;
         }
     }
+    let attributes = extract_xml_attributes(event_open)?;
     Ok(HEPEUP{
         NUP, IDRUP, XWGTUP, SCALUP, AQEDUP, AQCDUP,
         IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP,
-        info
+        info, attributes,
     })
 }
 
@@ -407,6 +411,8 @@ pub struct HEPEUP{
     pub SPINUP: Vec<f64>,
     /// Optional event information
     pub info: String,
+    /// Attributes in <event> tag
+    pub attributes: HashMap<String, String>,
 }
 
 #[derive(Debug)]
@@ -528,7 +534,15 @@ mod tests {
             let attr = lhef.heprup().attributes.get("testattribute");
             assert_eq!(attr.unwrap().as_str(), "testvalue");
         }
-        let mut nevents = 0;
+        let first_event = lhef.event().unwrap().unwrap();
+        let expected_attributes = {
+            let mut hash = HashMap::new();
+            hash.insert(String::from("attr0"), String::from("t0"));
+            hash.insert(String::from("attr1"), String::from(""));
+            hash
+        };
+        assert_eq!(first_event.attributes, expected_attributes);
+        let mut nevents = 1;
         while let Ok(Some(_)) = lhef.event() { nevents += 1 };
         assert_eq!(nevents, 10);
     }
