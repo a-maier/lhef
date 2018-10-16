@@ -19,6 +19,7 @@ const EVENT_END: &'static str = "</event>";
 const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
 
 pub type XmlTree = xmltree::Element;
+pub type XmlAttr = HashMap<String, String>;
 
 /// Reader for the LHEF format
 pub struct Reader<Stream> {
@@ -197,36 +198,54 @@ fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
     Ok(tag.trim_left())
 }
 
-// TODO: refactor
-fn extract_xml_attr(xml_tag: &str) ->
-    Result<HashMap<String, String>, Box<error::Error>> {
-        use ParseError::BadXmlTag;
-        let mut tag = extract_xml_attr_str(xml_tag)?;
+struct Attr<'a> {
+    name: &'a str,
+    value: &'a str,
+}
+
+fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> {
+    use ParseError::BadXmlTag;
+    let mut rem = attr_str;
+    let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
+    let name = match name_end {
+        None => return Ok((None, rem)),
+        Some(idx) => &rem[..idx],
+    };
+    rem = rem[name.len()..].trim_left();
+    if rem.chars().next() != Some('=') {
+        return Err(Box::new(BadXmlTag(attr_str.to_owned())));
+    }
+    rem = rem[1..].trim_left();
+    let quote = rem.chars().next();
+    if quote != Some('\'') && quote != Some('"') {
+        return Err(Box::new(BadXmlTag(attr_str.to_owned())));
+    }
+    let quote = quote.unwrap();
+    rem = &rem[1..];
+    let value_end = rem.find(quote);
+    let value = match value_end {
+        Some(idx) => &rem[..idx],
+        None => return Err(Box::new(BadXmlTag(attr_str.to_owned()))),
+    };
+    rem = &rem[value.len()+1..].trim_left();
+    let attr = Attr{name, value};
+    Ok((Some(attr), rem))
+}
+
+fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
+        let mut attr_str = extract_xml_attr_str(xml_tag)?;
         let mut attr = HashMap::new();
         loop {
-            let name_end = tag.find(|c: char| c.is_whitespace() || c == '=');
-            let name = match name_end {
+            let (parsed, rem) = next_attr(attr_str)?;
+            match parsed {
                 None => return Ok(attr),
-                Some(idx) => tag[..idx].to_owned(),
+                Some(next_attr) => {
+                    let name = next_attr.name.to_string();
+                    let value = next_attr.value.to_string();
+                    attr.insert(name, value);
+                },
             };
-            tag = tag[name.len()..].trim_left();
-            if tag.chars().next() != Some('=') {
-                return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
-            }
-            tag = tag[1..].trim_left();
-            let quote = tag.chars().next();
-            if quote != Some('\'') && quote != Some('"') {
-                return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
-            }
-            let quote = quote.unwrap();
-            tag = &tag[1..];
-            let value_end = tag.find(quote);
-            let value = match value_end {
-                Some(idx) => tag[..idx].to_owned(),
-                None => return Err(Box::new(BadXmlTag(xml_tag.to_owned()))),
-            };
-            tag = &tag[value.len()+1..].trim_left();
-            attr.insert(name, value);
+            attr_str = rem;
         }
 }
 
@@ -378,7 +397,7 @@ pub struct HEPRUP {
     /// Optional run information
     pub info: String,
     /// Attributes in <init> tag
-    pub attr: HashMap<String, String>,
+    pub attr: XmlAttr,
 }
 
 /// Event information
@@ -417,7 +436,7 @@ pub struct HEPEUP{
     /// Optional event information
     pub info: String,
     /// Attributes in <event> tag
-    pub attr: HashMap<String, String>,
+    pub attr: XmlAttr,
 }
 
 #[derive(Debug)]
