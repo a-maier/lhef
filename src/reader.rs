@@ -6,23 +6,12 @@ use std::io::BufRead;
 use std::fmt;
 use std::str;
 use std::error;
-use std::collections::HashMap;
-
-const LHEF_TAG_OPEN: &'static str = "<LesHouchesEvents version=";
-const COMMENT_START: &'static str = "<!--";
-const COMMENT_END: &'static str = "-->";
-const HEADER_START: &'static str = "<header";
-const HEADER_END: &'static str = "</header>";
-const INIT_START: &'static str = "<init";
-const INIT_END: &'static str = "</init>";
-const EVENT_START: &'static str = "<event";
-const EVENT_END: &'static str = "</event>";
-const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
+use tags::*;
 
 pub type XmlTree = xmltree::Element;
-pub type XmlAttr = HashMap<String, String>;
 
 /// Reader for the LHEF format
+#[derive(Debug)]
 pub struct Reader<Stream> {
     stream: Stream,
     version: &'static str,
@@ -248,7 +237,7 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
 
 fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
         let mut attr_str = extract_xml_attr_str(xml_tag)?;
-        let mut attr = HashMap::new();
+        let mut attr = XmlAttr::new();
         loop {
             let (parsed, rem) = next_attr(attr_str)?;
             match parsed {
@@ -561,7 +550,7 @@ mod tests {
         }
         let first_event = lhef.event().unwrap().unwrap();
         let expected_attr = {
-            let mut hash = HashMap::new();
+            let mut hash = XmlAttr::new();
             hash.insert(String::from("attr0"), String::from("t0"));
             hash.insert(String::from("attr1"), String::from(""));
             hash
