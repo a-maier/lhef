@@ -1,13 +1,10 @@
-extern crate xmltree;
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
 use std::io::BufRead;
 use std::fmt;
 use std::str;
 use std::error;
 use tags::*;
 use fortran_blocks::*;
+use xmltree;
 
 pub type XmlTree = xmltree::Element;
 
