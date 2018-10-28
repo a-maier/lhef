@@ -13,8 +13,8 @@ pub type XmlTree = xmltree::Element;
 
 /// Reader for the LHEF format
 #[derive(Debug)]
-pub struct Reader<Stream> {
-    stream: Stream,
+pub struct Reader<T> {
+    stream: T,
     version: &'static str,
     header: String,
     xml_header: Option<XmlTree>,
@@ -34,7 +34,7 @@ enum ParseError {
     EndOfFile(&'static str),
 }
 
-impl<Stream: BufRead> Reader<Stream> {
+impl<T: BufRead> Reader<T> {
     /// Create a new LHEF reader
     ///
     /// # Example
@@ -44,7 +44,7 @@ impl<Stream: BufRead> Reader<Stream> {
     /// let file = std::io::BufReader::new(file);
     /// let reader = lhef::Reader::new(file).unwrap();
     /// ```
-    pub fn new(mut stream: Stream) -> Result<Reader<Stream>, Box<error::Error>> {
+    pub fn new(mut stream: T) -> Result<Reader<T>, Box<error::Error>> {
         let version = parse_version(&mut stream)?;
         let (header, xml_header, init_start) = parse_header(&mut stream)?;
         let heprup = parse_init(&init_start, &mut stream)?;
@@ -101,7 +101,7 @@ impl<Stream: BufRead> Reader<Stream> {
     }
 }
 
-fn parse_version<Stream: BufRead>(stream: &mut Stream) -> Result<&'static str, Box<error::Error>> {
+fn parse_version<T: BufRead>(stream: &mut T) -> Result<&'static str, Box<error::Error>> {
     use self::ParseError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
@@ -127,7 +127,7 @@ fn parse_version<Stream: BufRead>(stream: &mut Stream) -> Result<&'static str, B
     Ok(version)
 }
 
-fn parse_header<Stream: BufRead>(mut stream: &mut Stream) ->
+fn parse_header<T: BufRead>(mut stream: &mut T) ->
     Result<(String, Option<XmlTree>, String), Box<error::Error>>
 {
     use self::ParseError::BadHeaderStart;
@@ -163,8 +163,8 @@ fn pop_line(s: &mut String) {
     }
 }
 
-fn read_lines_until<Stream: BufRead>(
-    stream: &mut Stream, header: &mut String, header_end: &str
+fn read_lines_until<T: BufRead>(
+    stream: &mut T, header: &mut String, header_end: &str
 ) -> Result<(), Box<error::Error>> {
     loop {
         if stream.read_line(header)? == 0 {
@@ -254,8 +254,8 @@ fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
 }
 
 #[allow(non_snake_case)]
-fn parse_init<Stream: BufRead>(
-    init_open: &str, stream: &mut Stream
+fn parse_init<T: BufRead>(
+    init_open: &str, stream: &mut T
 ) -> Result<HEPRUP, Box<error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
@@ -310,8 +310,8 @@ fn parse_init<Stream: BufRead>(
 }
 
 #[allow(non_snake_case)]
-fn parse_event<Stream: BufRead>(
-    event_open: &str, stream: &mut Stream
+fn parse_event<T: BufRead>(
+    event_open: &str, stream: &mut T
 ) -> Result<HEPEUP, Box<error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;

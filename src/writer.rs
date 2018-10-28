@@ -7,8 +7,8 @@ use std::io;
 
 /// Writer for the LHEF format
 #[derive(Debug)]
-pub struct Writer<Stream: Write> {
-    stream: Stream,
+pub struct Writer<T: Write> {
+    stream: T,
 }
 
 #[derive(Debug)]
@@ -51,10 +51,10 @@ impl error::Error for WriteError {
     }
 }
 
-impl<Stream: Write> Writer<Stream> {
+impl<T: Write> Writer<T> {
     pub fn new(
-        mut stream: Stream, version: &str
-    ) -> Result<Writer<Stream>, Box<error::Error>>
+        mut stream: T, version: &str
+    ) -> Result<Writer<T>, Box<error::Error>>
     {
         let output = [LHEF_TAG_OPEN, "\"", version, "\">\n"];
         for text in &output {
@@ -63,14 +63,14 @@ impl<Stream: Write> Writer<Stream> {
         Ok(Writer{stream})
     }
 
-    fn write<T: fmt::Display + ?Sized> (
-        &mut self, expr: &T
+    fn write<U: fmt::Display + ?Sized> (
+        &mut self, expr: &U
     )  -> Result<(), io::Error> {
         self.stream.write_all(format!("{}", expr).as_bytes())
     }
 
-    fn write_field<T: fmt::Display + ?Sized> (
-        &mut self, expr: &T
+    fn write_field<U: fmt::Display + ?Sized> (
+        &mut self, expr: &U
     )  -> Result<(), io::Error> {
         self.stream.write_all(format!("{} ", expr).as_bytes())
     }
