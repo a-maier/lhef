@@ -226,7 +226,9 @@ impl<T: Write> Writer<T> {
         self.write_field(&event.IDRUP)?;
         self.write_field(&event.XWGTUP)?;
         self.write_field(&event.SCALUP)?;
+        self.write_field(&event.AQEDUP)?;
         self.write_field(&event.AQCDUP)?;
+        self.write("\n")?;
         let particles = izip!(
             &event.IDUP, &event.ISTUP, &event.MOTHUP, &event.ICOLUP,
             &event.PUP, &event.VTIMUP, &event.SPINUP,
@@ -332,6 +334,6 @@ mod tests {
             writer.hepeup(&hepeup).unwrap();
             writer.finish().unwrap();
         }
-        //println!("{}", str::from_utf8(&buf).unwrap());
+        // println!("{}", str::from_utf8(&buf).unwrap());
     }
 }
