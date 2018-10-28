@@ -3,7 +3,7 @@ use tags::*;
 use fortran_blocks::*;
 use std::error;
 use std::fmt;
-use std::io::Error;
+use std::io;
 
 /// Writer for the LHEF format
 #[derive(Debug)]
@@ -65,13 +65,13 @@ impl<Stream: Write> Writer<Stream> {
 
     fn write<T: fmt::Display + ?Sized> (
         &mut self, expr: &T
-    )  -> Result<(), Error> {
+    )  -> Result<(), io::Error> {
         self.stream.write_all(format!("{}", expr).as_bytes())
     }
 
     fn write_field<T: fmt::Display + ?Sized> (
         &mut self, expr: &T
-    )  -> Result<(), Error> {
+    )  -> Result<(), io::Error> {
         self.stream.write_all(format!("{} ", expr).as_bytes())
     }
 
@@ -265,7 +265,8 @@ mod tests {
             ),
             attr: XmlAttr::new(),
         };
-        let mut writer = Writer::new(io::stdout(), "1.0").unwrap();
+        let buf = io::Cursor::new(vec!());
+        let mut writer = Writer::new(buf, "1.0").unwrap();
         writer.write_header("some header").unwrap();
         let mut attr = HashMap::new();
         attr.insert("attr0".to_string(), "val0".to_string());
