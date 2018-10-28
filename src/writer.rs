@@ -9,6 +9,26 @@ use xmltree;
 pub type XmlTree = xmltree::Element;
 
 /// Writer for the LHEF format
+///
+/// The general usage to write a file is
+///
+/// ```rust,ignore
+/// // create writer
+/// let mut writer = lhef::Writer::new(my_file, version)?;
+/// // optionally write headers
+/// writer.header(my_header)?;
+/// writer.xml_header(my_xml_header)?;
+/// // write run information
+/// writer.heprup(my_heprup)?;
+/// // write events
+/// loop {
+///    writer.hepeup(my_hepeup)?;
+/// }
+/// //  wrap up
+/// writer.finish()?;
+/// ```
+/// It is important to keep the proper order of method calls and to call
+/// finish() at the end.
 #[derive(Debug)]
 pub struct Writer<T: Write> {
     stream: T,
@@ -55,6 +75,25 @@ impl error::Error for WriteError {
 }
 
 impl<T: Write> Writer<T> {
+    /// Create a new LHEF writer
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// // write to a file in LHEF version 1.0
+    /// let mut file = std::fs::File::create("events.lhe").unwrap();
+    /// let writer = lhef::Writer::new(
+    ///    &mut file, "1.0"
+    /// ).unwrap();
+    /// ```
+    ///
+    /// ```rust
+    /// // write to a byte vector
+    /// let mut output = vec![];
+    /// let writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// ```
     pub fn new(
         mut stream: T, version: &str
     ) -> Result<Writer<T>, Box<error::Error>>
@@ -78,12 +117,16 @@ impl<T: Write> Writer<T> {
         self.stream.write_all(format!("{} ", expr).as_bytes())
     }
 
-    pub fn finish(&mut self) -> Result<(), Box<error::Error>> {
-        self.write(LHEF_LAST_LINE)?;
-        self.write("\n")?;
-        Ok(())
-    }
-
+    /// Write a LHEF comment header
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// writer.header("some header text").unwrap();
+    /// ```
     pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
         let output = [COMMENT_START, "\n", header, "\n", COMMENT_END, "\n"];
         for text in &output {
@@ -110,6 +153,36 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
+    /// Write a LHEF xml header
+    ///
+    /// If the outermost xml tag in the argument is not "header" an
+    /// additional "header" tag will be wrapped around the output. Line
+    /// breaks may be added to ensure conformance with the LHEF
+    /// standard.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// let header = {
+    ///     let mut attr = std::collections::HashMap::new();
+    ///     attr.insert("attr0".to_string(), "val0".to_string());
+    ///     attr.insert("attr1".to_string(), "".to_string());
+    ///     lhef::XmlTree{
+    ///         prefix: None,
+    ///         namespace: None,
+    ///         namespaces: None,
+    ///         name: String::from("header"),
+    ///         attributes: attr,
+    ///         children: vec![],
+    ///         text: Some(String::from("some xml header")),
+    ///     }
+    /// };
+    /// writer.xml_header(&header).unwrap();
+    /// ```
     pub fn xml_header(
         &mut self, header: &XmlTree
     ) -> Result<(), Box<error::Error>> {
@@ -148,7 +221,31 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
-    //TODO: can we combine all iterators?
+    /// Write the run information in HEPRUP format
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// let heprup = lhef::HEPRUP {
+    ///     IDBMUP: [2212, 2212],
+    ///     EBMUP: [7000.0, 7000.0],
+    ///     PDFGUP: [0, 0],
+    ///     PDFSUP: [230000, 230000],
+    ///     IDWTUP: 2,
+    ///     NPRUP: 1,
+    ///     XSECUP: vec!(120588124.02),
+    ///     XERRUP: vec!(702517.48228),
+    ///     XMAXUP: vec!(94290.49),
+    ///     LPRUP:  vec!(1),
+    ///     info: String::new(),
+    ///     attr: lhef::XmlAttr::new(),
+    /// };
+    /// writer.heprup(&heprup).unwrap();
+    /// ```
     pub fn heprup(
         &mut self, runinfo: &HEPRUP
     ) -> Result<(), Box<error::Error>> {
@@ -202,6 +299,39 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
+    /// Write event in HEPEUP format
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// let hepeup = lhef::HEPEUP {
+    ///     NUP: 4,
+    ///     IDRUP: 1,
+    ///     XWGTUP: 84515.12,
+    ///     SCALUP: 91.188,
+    ///     AQEDUP: 0.007546771,
+    ///     AQCDUP: 0.1190024,
+    ///     IDUP: vec!(1, 21, 21, 1),
+    ///     ISTUP: vec!(-1, -1, 1, 1),
+    ///     MOTHUP: vec!([0, 0], [0, 0], [1, 2], [1, 2]),
+    ///     ICOLUP: vec!([503, 0], [501, 502], [503, 502], [501, 0]),
+    ///     PUP: vec!(
+    ///         [0.0, 0.0, 4.7789443449, 4.7789443449, 0.0],
+    ///         [0.0, 0.0, -1240.3761329, 1240.3761329, 0.0],
+    ///         [37.283715118, 21.98166528, -1132.689358, 1133.5159684, 0.0],
+    ///         [-37.283715118, -21.98166528, -102.90783056, 111.63910879, 0.0]
+    ///     ),
+    ///     VTIMUP: vec!(0.0, 0.0, 0.0, 0.0),
+    ///     SPINUP: vec!(1.0, -1.0, -1.0, 1.0),
+    ///     info: String::new(),
+    ///     attr: lhef::XmlAttr::new(),
+    /// };
+    /// writer.hepeup(&hepeup).unwrap();
+    /// ```
     pub fn hepeup(
         &mut self, event: &HEPEUP
     ) -> Result<(), Box<error::Error>> {
@@ -251,6 +381,23 @@ impl<T: Write> Writer<T> {
         }
         self.write(EVENT_END)?;
         self.write(&'\n')?;
+        Ok(())
+    }
+
+    /// Close LHEF output
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// writer.finish().unwrap();
+    /// ```
+    pub fn finish(&mut self) -> Result<(), Box<error::Error>> {
+        self.write(LHEF_LAST_LINE)?;
+        self.write("\n")?;
         Ok(())
     }
 }

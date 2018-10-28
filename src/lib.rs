@@ -14,6 +14,8 @@ pub use fortran_blocks::*;
 pub use reader::*;
 pub use writer::*;
 
+pub type XmlTree = xmltree::Element;
+
 #[cfg(test)]
 mod tests {
     extern crate flate2;
