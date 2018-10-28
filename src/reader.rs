@@ -61,17 +61,17 @@ impl<Stream: BufRead> Reader<Stream> {
         &self.header
     }
 
-    /// Get the LHEF header
+    /// Get the LHEF xml header
     pub fn xml_header(&self) -> &Option<XmlTree> {
         &self.xml_header
     }
 
-    /// Get the LHEF run information
+    /// Get the run information in HEPRUP format
     pub fn heprup(&self) -> &HEPRUP {
         &self.heprup
     }
 
-    /// Get the next event
+    /// Get the next event in HEPEUP format
     ///
     /// # Example
     ///
@@ -80,13 +80,13 @@ impl<Stream: BufRead> Reader<Stream> {
     /// let file = std::io::BufReader::new(file);
     /// let mut reader = lhef::Reader::new(file).unwrap();
     ///
-    /// let event = reader.event().unwrap();
+    /// let event = reader.hepeup().unwrap();
     /// match event {
     ///    Some(event) => println!("Found an event."),
     ///    None => println!("Reached end of event file."),
     /// }
     /// ```
-    pub fn event(&mut self) -> Result<Option<HEPEUP>, Box<error::Error>> {
+    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, Box<error::Error>> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
         if line.starts_with(EVENT_START) {
@@ -464,7 +464,7 @@ mod tests {
         }
         assert!(lhef.heprup().attr.is_empty());
         let mut nevents = 0;
-        while let Ok(Some(_)) = lhef.event() { nevents += 1 };
+        while let Ok(Some(_)) = lhef.hepeup() { nevents += 1 };
         assert_eq!(nevents, 1628);
     }
 
@@ -477,7 +477,7 @@ mod tests {
             let attr = lhef.heprup().attr.get("testattribute");
             assert_eq!(attr.unwrap().as_str(), "testvalue");
         }
-        let first_event = lhef.event().unwrap().unwrap();
+        let first_event = lhef.hepeup().unwrap().unwrap();
         let expected_attr = {
             let mut hash = XmlAttr::new();
             hash.insert(String::from("attr0"), String::from("t0"));
@@ -486,7 +486,7 @@ mod tests {
         };
         assert_eq!(first_event.attr, expected_attr);
         let mut nevents = 1;
-        while let Ok(Some(_)) = lhef.event() { nevents += 1 };
+        while let Ok(Some(_)) = lhef.hepeup() { nevents += 1 };
         assert_eq!(nevents, 10);
     }
 }
