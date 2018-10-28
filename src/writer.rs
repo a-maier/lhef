@@ -99,27 +99,52 @@ impl<T: Write> Writer<T> {
         for (key, value) in &xml.attributes {
             self.write(&format!(" {}=\"{}\"", key, value))?;
         }
-        self.write(">\n")?;
+        self.write(">")?;
         if let Some(ref text) = xml.text {
             self.write(text)?;
         }
         for child in &xml.children {
             self.write_xml(child)?
         }
-        self.write(&format!("\n</{}>\n", xml.name))?;
+        self.write(&format!("</{}>", xml.name))?;
         Ok(())
     }
 
     pub fn xml_header(
         &mut self, header: &XmlTree
     ) -> Result<(), Box<error::Error>> {
+        self.write(HEADER_START)?;
         if header.name != "header" {
-            self.write(&format!("{}>\n", HEADER_START))?;
+            self.write(">\n")?;
+            self.write_xml(header)?;
+            self.write("\n")?;
         }
-        self.write_xml(header)?;
-        if header.name != "header" {
-            self.write(&format!("{}\n", HEADER_END))?;
+        else {
+            for (key, value) in &header.attributes {
+                self.write(&format!(" {}=\"{}\"", key, value))?;
+            }
+            self.write(">")?;
+            if !header.children.is_empty() {
+                self.write("\n")?;
+                for child in &header.children {
+                    self.write_xml(child)?;
+                }
+            }
+            match header.text {
+                None => self.write("\n")?,
+                Some(ref text) => {
+                    if header.children.is_empty() && !text.starts_with("\n") {
+                        self.write("\n")?;
+                    }
+                    self.write(text)?;
+                    if !text.ends_with("\n") {
+                        self.write("\n")?;
+                    }
+                }
+            };
         }
+        self.write(HEADER_END)?;
+        self.write("\n")?;
         Ok(())
     }
 
