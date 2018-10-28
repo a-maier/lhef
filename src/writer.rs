@@ -4,6 +4,9 @@ use fortran_blocks::*;
 use std::error;
 use std::fmt;
 use std::io;
+use xmltree;
+
+pub type XmlTree = xmltree::Element;
 
 /// Writer for the LHEF format
 #[derive(Debug)]
@@ -89,21 +92,34 @@ impl<T: Write> Writer<T> {
         Ok(())
     }
 
-    pub fn xml_header(
-        &mut self, header: &str, attr: &XmlAttr
+    fn write_xml(
+        &mut self, xml: &XmlTree
     ) -> Result<(), Box<error::Error>> {
-        self.write(HEADER_START)?;
-        for (key, value) in attr.iter() {
-            let output = [" ", key, "='", value, "'"];
-            for text in &output {
-                self.write(text)?;
-            }
+        self.write(&format!("<{}", xml.name))?;
+        for (key, value) in &xml.attributes {
+            self.write(&format!(" {}=\"{}\"", key, value))?;
         }
         self.write(">\n")?;
-        self.write(header)?;
-        self.write("\n")?;
-        self.write(HEADER_END)?;
-        self.write("\n")?;
+        if let Some(ref text) = xml.text {
+            self.write(text)?;
+        }
+        for child in &xml.children {
+            self.write_xml(child)?
+        }
+        self.write(&format!("\n</{}>\n", xml.name))?;
+        Ok(())
+    }
+
+    pub fn xml_header(
+        &mut self, header: &XmlTree
+    ) -> Result<(), Box<error::Error>> {
+        if header.name != "header" {
+            self.write(&format!("{}>\n", HEADER_START))?;
+        }
+        self.write_xml(header)?;
+        if header.name != "header" {
+            self.write(&format!("{}\n", HEADER_END))?;
+        }
         Ok(())
     }
 
@@ -217,6 +233,7 @@ mod tests {
     use super::*;
     use std::io;
     use std::collections::HashMap;
+    use std::str;
 
     #[test]
     fn write() {
@@ -265,15 +282,31 @@ mod tests {
             ),
             attr: XmlAttr::new(),
         };
-        let buf = io::Cursor::new(vec!());
-        let mut writer = Writer::new(buf, "1.0").unwrap();
-        writer.header("some header").unwrap();
-        let mut attr = HashMap::new();
-        attr.insert("attr0".to_string(), "val0".to_string());
-        attr.insert("attr1".to_string(), "".to_string());
-        writer.xml_header("some xml header", &attr).unwrap();
-        writer.heprup(&heprup).unwrap();
-        writer.hepeup(&hepeup).unwrap();
-        writer.finish().unwrap();
+        let mut buf = vec![];
+        {
+            let mut writer = Writer::new(
+                io::Cursor::new(&mut buf), "1.0"
+            ).unwrap();
+            writer.header("some header").unwrap();
+            let header = {
+                let mut attr = HashMap::new();
+                attr.insert("attr0".to_string(), "val0".to_string());
+                attr.insert("attr1".to_string(), "".to_string());
+                XmlTree{
+                    prefix: None,
+                    namespace: None,
+                    namespaces: None,
+                    name: String::from("header"),
+                    attributes: attr,
+                    children: vec![],
+                    text: Some(String::from("some xml header")),
+                }
+            };
+            writer.xml_header(&header).unwrap();
+            writer.heprup(&heprup).unwrap();
+            writer.hepeup(&hepeup).unwrap();
+            writer.finish().unwrap();
+        }
+        //println!("{}", str::from_utf8(&buf).unwrap());
     }
 }
