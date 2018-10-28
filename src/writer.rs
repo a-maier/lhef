@@ -81,7 +81,7 @@ impl<Stream: Write> Writer<Stream> {
         Ok(())
     }
 
-    pub fn write_header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
+    pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
         let output = [COMMENT_START, "\n", header, "\n", COMMENT_END, "\n"];
         for text in &output {
             self.write(text)?;
@@ -89,7 +89,7 @@ impl<Stream: Write> Writer<Stream> {
         Ok(())
     }
 
-    pub fn write_xml_header(
+    pub fn xml_header(
         &mut self, header: &str, attr: &XmlAttr
     ) -> Result<(), Box<error::Error>> {
         self.write(HEADER_START)?;
@@ -108,7 +108,7 @@ impl<Stream: Write> Writer<Stream> {
     }
 
     //TODO: can we combine all iterators?
-    pub fn write_init(
+    pub fn heprup(
         &mut self, runinfo: &HEPRUP
     ) -> Result<(), Box<error::Error>> {
         let num_sub = runinfo.NPRUP as usize;
@@ -161,7 +161,7 @@ impl<Stream: Write> Writer<Stream> {
         Ok(())
     }
 
-    pub fn write_event(
+    pub fn hepeup(
         &mut self, event: &HEPEUP
     ) -> Result<(), Box<error::Error>> {
         let num_particles = event.NUP as usize;
@@ -267,13 +267,13 @@ mod tests {
         };
         let buf = io::Cursor::new(vec!());
         let mut writer = Writer::new(buf, "1.0").unwrap();
-        writer.write_header("some header").unwrap();
+        writer.header("some header").unwrap();
         let mut attr = HashMap::new();
         attr.insert("attr0".to_string(), "val0".to_string());
         attr.insert("attr1".to_string(), "".to_string());
-        writer.write_xml_header("some xml header", &attr).unwrap();
-        writer.write_init(&heprup).unwrap();
-        writer.write_event(&hepeup).unwrap();
+        writer.xml_header("some xml header", &attr).unwrap();
+        writer.heprup(&heprup).unwrap();
+        writer.hepeup(&hepeup).unwrap();
         writer.finish().unwrap();
     }
 }
