@@ -553,12 +553,31 @@ impl error::Error for ParseError {
 #[derive(Debug)]
 pub struct Writer<T: Write> {
     stream: T,
+    state: WriterState,
+}
+
+// TODO: implement copy?
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug,Clone,Hash,PartialEq,Eq)]
+/// State of LHEF writer
+pub enum WriterState {
+    /// The next object to be written should be a header or an init block
+    ExpectingHeaderOrInit,
+    /// The writer can either write an event or finish the LHEF file
+    ExpectingEventOrFinish,
+    /// The LHEF file is complete and no further writing is allowed
+    Finished,
+    /// A previous write failed and the LHEF file is in an undetermined
+    /// (possible broken) state
+    Failed,
 }
 
 #[derive(Debug)]
 enum WriteError {
     MismatchedSubprocesses,
     MismatchedParticles,
+    BadState(WriterState, &'static str),
+    WriteToFailed,
 }
 
 impl fmt::Display for WriteError {
@@ -569,16 +588,30 @@ impl fmt::Display for WriteError {
                 write!(
                     f,
                     "Mismatch between NPRUP and length of at least one of \
-                     XSECUP, XERRUP, XMAXUP, LPRUP"
+                     XSECUP, XERRUP, XMAXUP, LPRUP."
                 )
             },
             MismatchedParticles => {
                 write!(
                     f,
                     "Mismatch between NUP and length of at least one of \
-                     IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP"
+                     IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP."
                 )
             },
+            BadState(ref state, attempt) => {
+                write!(
+                    f,
+                    "Writer is in state '{:?}', cannot write '{}'.",
+                    state, attempt
+                )
+            },
+            WriteToFailed => {
+                write!(
+                    f,
+                    "Writer is in 'Failed' state. \
+                     Output was written, but the file may be broken anyway."
+                )
+            }
         }
     }
 }
@@ -623,7 +656,27 @@ impl<T: Write> Writer<T> {
         for text in &output {
             stream.write_all(text.as_bytes())?;
         }
-        Ok(Writer{stream})
+        Ok(Writer{stream, state: WriterState::ExpectingHeaderOrInit})
+    }
+
+    fn assert_state(
+        &self, expected: WriterState, from: &'static str
+    ) -> Result<(), Box<error::Error>> {
+        if self.state != expected && self.state != WriterState::Failed {
+            Err(Box::new(WriteError::BadState(self.state.clone(), from)))
+        }
+        else {
+            Ok(())
+        }
+    }
+
+    fn ok_unless_failed(&self) -> Result<(), Box<error::Error>> {
+        if self.state == WriterState::Failed {
+            Err(Box::new(WriteError::WriteToFailed))
+        }
+        else {
+            Ok(())
+        }
     }
 
     fn write<U: fmt::Display + ?Sized> (
@@ -649,11 +702,12 @@ impl<T: Write> Writer<T> {
     /// writer.header("some header text").unwrap();
     /// ```
     pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
+        self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
         let output = [COMMENT_START, "\n", header, "\n", COMMENT_END, "\n"];
         for text in &output {
             self.write(text)?;
         }
-        Ok(())
+        self.ok_unless_failed()
     }
 
     fn write_xml(
@@ -707,6 +761,7 @@ impl<T: Write> Writer<T> {
     pub fn xml_header(
         &mut self, header: &XmlTree
     ) -> Result<(), Box<error::Error>> {
+        self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
         self.write(HEADER_START)?;
         if header.name != "header" {
             self.write(">\n")?;
@@ -739,7 +794,7 @@ impl<T: Write> Writer<T> {
         }
         self.write(HEADER_END)?;
         self.write("\n")?;
-        Ok(())
+        self.ok_unless_failed()
     }
 
     /// Write the run information in HEPRUP format
@@ -770,6 +825,7 @@ impl<T: Write> Writer<T> {
     pub fn heprup(
         &mut self, runinfo: &HEPRUP
     ) -> Result<(), Box<error::Error>> {
+        self.assert_state(WriterState::ExpectingHeaderOrInit, "init")?;
         let num_sub = runinfo.NPRUP as usize;
         if
             num_sub != runinfo.XSECUP.len()
@@ -817,18 +873,22 @@ impl<T: Write> Writer<T> {
         }
         self.write(INIT_END)?;
         self.write(&'\n')?;
-        Ok(())
+        if self.state != WriterState::Failed {
+            self.state = WriterState::ExpectingEventOrFinish
+        }
+        self.ok_unless_failed()
     }
 
     /// Write event in HEPEUP format
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// let mut output = vec![];
     /// let mut writer = lhef::Writer::new(
     ///    std::io::Cursor::new(&mut output), "1.0"
     /// ).unwrap();
+    /// // ... write run information here ...
     /// let hepeup = lhef::HEPEUP {
     ///     NUP: 4,
     ///     IDRUP: 1,
@@ -856,6 +916,7 @@ impl<T: Write> Writer<T> {
     pub fn hepeup(
         &mut self, event: &HEPEUP
     ) -> Result<(), Box<error::Error>> {
+        self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
         if
                num_particles != event.IDUP.len()
@@ -902,24 +963,29 @@ impl<T: Write> Writer<T> {
         }
         self.write(EVENT_END)?;
         self.write(&'\n')?;
-        Ok(())
+        self.ok_unless_failed()
     }
 
     /// Close LHEF output
     ///
     /// # Example
     ///
-    /// ```rust
+    /// ```rust,no_run
     /// let mut output = vec![];
     /// let mut writer = lhef::Writer::new(
     ///    std::io::Cursor::new(&mut output), "1.0"
     /// ).unwrap();
+    /// // ... write header, run information, events ...
     /// writer.finish().unwrap();
     /// ```
     pub fn finish(&mut self) -> Result<(), Box<error::Error>> {
+        self.assert_state(WriterState::ExpectingEventOrFinish, "finish")?;
         self.write(LHEF_LAST_LINE)?;
         self.write("\n")?;
-        Ok(())
+        if self.state != WriterState::Failed {
+            self.state = WriterState::Finished
+        }
+        self.ok_unless_failed()
     }
 }
 
