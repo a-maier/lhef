@@ -928,12 +928,11 @@ impl<T: Write> Writer<T> {
             write!(&mut output, " {}=\"{}\"", attr, value)?;
         }
         output += ">\n";
-        write!(&mut output, "{} ", event.NUP)?;
-        write!(&mut output, "{} ", event.IDRUP)?;
-        write!(&mut output, "{} ", event.XWGTUP)?;
-        write!(&mut output, "{} ", event.SCALUP)?;
-        write!(&mut output, "{} ", event.AQEDUP)?;
-        write!(&mut output, "{} ", event.AQCDUP)?;
+        write!(
+            &mut output, "{} {} {} {} {} {} ",
+            event.NUP, event.IDRUP, event.XWGTUP,
+            event.SCALUP, event.AQEDUP, event.AQCDUP
+        )?;
         output += ">\n";
         let particles = izip!(
             &event.IDUP, &event.ISTUP, &event.MOTHUP, &event.ICOLUP,
