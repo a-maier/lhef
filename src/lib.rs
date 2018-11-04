@@ -1,3 +1,4 @@
+#![doc(html_root_url = "https://docs.rs/lhef/0.2.0")]
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
