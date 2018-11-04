@@ -1,6 +1,6 @@
 [package]
 name = "lhef"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Andreas Maier <andreas.martin.maier@desy.de>"]
 description = "Read and write files in the Les Houches Event File format"
 readme = "Readme.md"
