@@ -100,7 +100,7 @@ pub struct HEPEUP{
 }
 
 /// Reader for the LHEF format
-#[derive(Debug)]
+#[derive(Debug,PartialEq)]
 pub struct Reader<T> {
     stream: T,
     version: &'static str,
@@ -109,7 +109,7 @@ pub struct Reader<T> {
     heprup: HEPRUP,
 }
 
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Clone,Eq,Hash)]
 enum ParseError {
     BadFirstLine(String),
     BadHeaderStart(String),
@@ -566,15 +566,14 @@ fn xml_to_string(xml: &XmlTree, output: &mut String) {
 /// ```
 /// It is important to keep the proper order of method calls and to call
 /// finish() at the end.
-#[derive(Debug)]
+#[derive(Debug,PartialEq,Eq)]
 pub struct Writer<T: Write> {
     stream: T,
     state: WriterState,
 }
 
-// TODO: implement copy?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug,Clone,Hash,PartialEq,Eq)]
+#[derive(Debug,Clone,Hash,PartialEq,Eq,Copy)]
 /// State of LHEF writer
 pub enum WriterState {
     /// The next object to be written should be a header or an init block
@@ -588,7 +587,7 @@ pub enum WriterState {
     Failed,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Hash,PartialEq,Eq)]
 enum WriteError {
     MismatchedSubprocesses,
     MismatchedParticles,
@@ -677,7 +676,7 @@ impl<T: Write> Writer<T> {
         &self, expected: WriterState, from: &'static str
     ) -> Result<(), Box<error::Error>> {
         if self.state != expected && self.state != WriterState::Failed {
-            Err(Box::new(WriteError::BadState(self.state.clone(), from)))
+            Err(Box::new(WriteError::BadState(self.state, from)))
         }
         else {
             Ok(())
