@@ -576,16 +576,16 @@ pub struct Writer<T: Write> {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug,Clone,Hash,PartialEq,Eq,Copy)]
-/// State of LHEF writer
-pub enum WriterState {
-    /// The next object to be written should be a header or an init block
+// State of LHEF writer
+enum WriterState {
+    // The next object to be written should be a header or an init block
     ExpectingHeaderOrInit,
-    /// The writer can either write an event or finish the LHEF file
+    // The writer can either write an event or finish the LHEF file
     ExpectingEventOrFinish,
-    /// The LHEF file is complete and no further writing is allowed
+    // The LHEF file is complete and no further writing is allowed
     Finished,
-    /// A previous write failed and the LHEF file is in an undetermined
-    /// (possible broken) state
+    // A previous write failed and the LHEF file is in an undetermined
+    // (possible broken) state
     Failed,
 }
 
