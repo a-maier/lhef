@@ -2,7 +2,7 @@
 
 A library for interacting with files in the Les Houches Event File (LHEF) format.
 
-Lhef supports both reading and writing via the `Reader` and ``Writer`
+Lhef supports both reading and writing via the `Reader` and `Writer`
 structs. Information about the generator run is provided in a `HEPRUP`
 object and each event is stored in a `HEPEUP` object. These structs
 correspond to the Fortran common blocks of the same names in the
