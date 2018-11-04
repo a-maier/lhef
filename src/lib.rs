@@ -11,6 +11,7 @@ use std::str;
 use std::error;
 use std::io::{BufRead,Write};
 use std::collections::HashMap;
+use std::ops::Drop;
 
 pub type XmlTree = xmltree::Element;
 
@@ -991,6 +992,14 @@ impl<T: Write> Writer<T> {
             self.state = WriterState::Finished
         }
         self.ok_unless_failed()
+    }
+}
+
+impl<T: Write> Drop for Writer<T> {
+    fn drop(&mut self) {
+        if self.state == WriterState::ExpectingEventOrFinish {
+            let _ = self.finish();
+        }
     }
 }
 
