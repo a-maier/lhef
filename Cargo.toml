@@ -1,8 +1,8 @@
 [package]
 name = "lhef"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Andreas Maier <andreas.martin.maier@desy.de>"]
-description = "Read files in the Les Houches Event File format"
+description = "Read and write files in the Les Houches Event File format"
 readme = "Readme.md"
 license = "GPL-3.0-or-later"
 keywords = ["physics", "parser"]

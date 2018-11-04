@@ -2,8 +2,8 @@
 
 A library for interacting with files in the Les Houches Event File (LHEF) format.
 
-Currently, lhef only supports reading via the `Reader`
-struct. Information about the generator run is provided in a `HEPRUP`
+Lhef supports both reading and writing via the `Reader` and ``Writer`
+structs. Information about the generator run is provided in a `HEPRUP`
 object and each event is stored in a `HEPEUP` object. These structs
 correspond to the Fortran common blocks of the same names in the
 [original proposal](https://arxiv.org/abs/hep-ph/0109068v1), but contain
@@ -24,7 +24,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-lhef = "0.1.0"
+lhef = "0.2.0"
 ```
 
 and this to your crate root:
