@@ -6,9 +6,9 @@ extern crate xmltree;
 extern crate itertools;
 
 use std::fmt;
+use std::fmt::Write as FmtWrite;
 use std::str;
 use std::error;
-use std::io;
 use std::io::{BufRead,Write};
 use std::collections::HashMap;
 
@@ -529,6 +529,22 @@ impl error::Error for ParseError {
     }
 }
 
+fn xml_to_string(xml: &XmlTree, output: &mut String) {
+    *output += "<";
+    *output += &xml.name;
+    for (key, value) in &xml.attributes {
+        *output += &format!(" {}=\"{}\"", key, value);
+    }
+    *output += ">";
+    if let Some(ref text) = xml.text {
+        *output += text;
+    }
+    for child in &xml.children {
+        xml_to_string(&child, output)
+    }
+    *output += &format!("</{}>", xml.name);
+}
+
 /// Writer for the LHEF format
 ///
 /// The general usage to write a file is
@@ -652,10 +668,8 @@ impl<T: Write> Writer<T> {
         mut stream: T, version: &str
     ) -> Result<Writer<T>, Box<error::Error>>
     {
-        let output = [LHEF_TAG_OPEN, "\"", version, "\">\n"];
-        for text in &output {
-            stream.write_all(text.as_bytes())?;
-        }
+        let output = String::from(LHEF_TAG_OPEN) + "\"" + version + "\">\n";
+        stream.write_all(output.as_bytes())?;
         Ok(Writer{stream, state: WriterState::ExpectingHeaderOrInit})
     }
 
@@ -679,18 +693,6 @@ impl<T: Write> Writer<T> {
         }
     }
 
-    fn write<U: fmt::Display + ?Sized> (
-        &mut self, expr: &U
-    )  -> Result<(), io::Error> {
-        self.stream.write_all(format!("{}", expr).as_bytes())
-    }
-
-    fn write_field<U: fmt::Display + ?Sized> (
-        &mut self, expr: &U
-    )  -> Result<(), io::Error> {
-        self.stream.write_all(format!("{} ", expr).as_bytes())
-    }
-
     /// Write a LHEF comment header
     /// # Example
     ///
@@ -703,29 +705,16 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
-        let output = [COMMENT_START, "\n", header, "\n", COMMENT_END, "\n"];
-        for text in &output {
-            self.write(text)?;
+        let output =
+            String::from(COMMENT_START) + "\n" + header
+            + "\n" + COMMENT_END + "\n";
+        match self.stream.write_all(output.as_bytes()) {
+            Ok(_) => self.ok_unless_failed(),
+            Err(error) => {
+                self.state = WriterState::Failed;
+                Err(Box::new(error))
+            }
         }
-        self.ok_unless_failed()
-    }
-
-    fn write_xml(
-        &mut self, xml: &XmlTree
-    ) -> Result<(), Box<error::Error>> {
-        self.write(&format!("<{}", xml.name))?;
-        for (key, value) in &xml.attributes {
-            self.write(&format!(" {}=\"{}\"", key, value))?;
-        }
-        self.write(">")?;
-        if let Some(ref text) = xml.text {
-            self.write(text)?;
-        }
-        for child in &xml.children {
-            self.write_xml(child)?
-        }
-        self.write(&format!("</{}>", xml.name))?;
-        Ok(())
     }
 
     /// Write a LHEF xml header
@@ -762,39 +751,45 @@ impl<T: Write> Writer<T> {
         &mut self, header: &XmlTree
     ) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
-        self.write(HEADER_START)?;
+        let mut output = String::from(HEADER_START);
         if header.name != "header" {
-            self.write(">\n")?;
-            self.write_xml(header)?;
-            self.write("\n")?;
+            output += ">\n";
+            xml_to_string(&header, &mut output);
+            output += "\n";
         }
         else {
             for (key, value) in &header.attributes {
-                self.write(&format!(" {}=\"{}\"", key, value))?;
+                write!(&mut output, " {}=\"{}\"", key, value)?;
             }
-            self.write(">")?;
+            output += ">";
             if !header.children.is_empty() {
-                self.write("\n")?;
+                output += "\n";
                 for child in &header.children {
-                    self.write_xml(child)?;
+                    xml_to_string(&child, &mut output)
                 }
             }
             match header.text {
-                None => self.write("\n")?,
+                None => output += "\n",
                 Some(ref text) => {
                     if header.children.is_empty() && !text.starts_with("\n") {
-                        self.write("\n")?;
+                        output += "\n"
                     }
-                    self.write(text)?;
+                    output += text;
                     if !text.ends_with("\n") {
-                        self.write("\n")?;
+                        output += "\n";
                     }
                 }
             };
         }
-        self.write(HEADER_END)?;
-        self.write("\n")?;
-        self.ok_unless_failed()
+        output += HEADER_END;
+        output += "\n";
+        match self.stream.write_all(output.as_bytes()) {
+            Ok(_) => self.ok_unless_failed(),
+            Err(error) => {
+                self.state = WriterState::Failed;
+                Err(Box::new(error))
+            }
+        }
     }
 
     /// Write the run information in HEPRUP format
@@ -835,44 +830,43 @@ impl<T: Write> Writer<T> {
         {
             return Err(Box::new(WriteError::MismatchedSubprocesses))
         }
-        self.write(INIT_START)?;
+        let mut output = String::from(INIT_START);
         for (attr, value) in &runinfo.attr {
-            self.write(&format!("{} = \"{}\"", attr, value))?;
+            write!(&mut output, "{}=\"{}\"", attr, value)?;
         }
-        self.write(">\n")?;
+        output += ">\n";
         for entry in runinfo.IDBMUP.iter() {
-            self.write_field(entry)?;
+            write!(&mut output, "{} ", entry)?;
         }
         for entry in runinfo.EBMUP.iter() {
-            self.write_field(entry)?;
+            write!(&mut output, "{} ", entry)?;
         }
         for entry in runinfo.PDFGUP.iter() {
-            self.write_field(entry)?;
+            write!(&mut output, "{} ", entry)?;
         }
         for entry in runinfo.PDFSUP.iter() {
-            self.write_field(entry)?;
+            write!(&mut output, "{} ", entry)?;
         }
-        self.write_field(&runinfo.IDWTUP)?;
-        self.write(&runinfo.NPRUP)?;
-        self.write(&'\n')?;
+        write!(&mut output, "{} ", runinfo.IDWTUP)?;
+        write!(&mut output, "{}\n", runinfo.NPRUP)?;
         let subprocess_infos = izip!(
             &runinfo.XSECUP, &runinfo.XERRUP, &runinfo.XMAXUP, &runinfo.LPRUP
         );
         for (xs, xserr, xsmax, id) in subprocess_infos {
-            self.write_field(xs)?;
-            self.write_field(xserr)?;
-            self.write_field(xsmax)?;
-            self.write(id)?;
-            self.write(&'\n')?;
+            write!(&mut output, "{} {} {} {}\n", xs, xserr, xsmax, id)?;
         }
         if !runinfo.info.is_empty() {
-            self.write(&runinfo.info)?;
+            output += &runinfo.info;
             if runinfo.info.chars().last() != Some('\n') {
-                self.write(&'\n')?;
+                output += "\n"
             }
         }
-        self.write(INIT_END)?;
-        self.write(&'\n')?;
+        output += INIT_END;
+        output += "\n";
+        if let Err(error) = self.stream.write_all(output.as_bytes()) {
+            self.state = WriterState::Failed;
+            return Err(Box::new(error))
+        }
         if self.state != WriterState::Failed {
             self.state = WriterState::ExpectingEventOrFinish
         }
@@ -929,41 +923,50 @@ impl<T: Write> Writer<T> {
         {
             return Err(Box::new(WriteError::MismatchedParticles))
         }
-        self.write(EVENT_START)?;
+        let mut output = String::from(EVENT_START);
         for (attr, value) in &event.attr {
-            self.write(&format!("{} = \"{}\"", attr, value))?;
+            write!(&mut output, " {}=\"{}\"", attr, value)?;
         }
-        self.write(">\n")?;
-        self.write_field(&event.NUP)?;
-        self.write_field(&event.IDRUP)?;
-        self.write_field(&event.XWGTUP)?;
-        self.write_field(&event.SCALUP)?;
-        self.write_field(&event.AQEDUP)?;
-        self.write_field(&event.AQCDUP)?;
-        self.write("\n")?;
+        output += ">\n";
+        write!(&mut output, "{} ", event.NUP)?;
+        write!(&mut output, "{} ", event.IDRUP)?;
+        write!(&mut output, "{} ", event.XWGTUP)?;
+        write!(&mut output, "{} ", event.SCALUP)?;
+        write!(&mut output, "{} ", event.AQEDUP)?;
+        write!(&mut output, "{} ", event.AQCDUP)?;
+        output += ">\n";
         let particles = izip!(
             &event.IDUP, &event.ISTUP, &event.MOTHUP, &event.ICOLUP,
             &event.PUP, &event.VTIMUP, &event.SPINUP,
         );
         for (id, status, mothers, colour, p, lifetime, spin) in particles {
-            self.write_field(id)?;
-            self.write_field(status)?;
-            for m in mothers { self.write_field(m)? }
-            for c in colour { self.write_field(c)? }
-            for p in p { self.write_field(p)? }
-            self.write_field(lifetime)?;
-            self.write(spin)?;
-            self.write(&'\n')?;
+            write!(&mut output, "{} {} ", id, status)?;
+            for m in mothers {
+                write!(&mut output, "{} ", m)?;
+            }
+            for c in colour {
+                write!(&mut output, "{} ", c)?;
+            }
+            for p in p {
+                write!(&mut output, "{} ", p)?;
+            }
+            write!(&mut output, "{} {}\n", lifetime, spin)?;
         }
         if !event.info.is_empty() {
-            self.write(&event.info)?;
+            output += &event.info;
             if event.info.chars().last() != Some('\n') {
-                self.write(&'\n')?;
+                output += "\n"
             }
         }
-        self.write(EVENT_END)?;
-        self.write(&'\n')?;
-        self.ok_unless_failed()
+        output += EVENT_END;
+        output += "\n";
+        match self.stream.write_all(output.as_bytes()) {
+            Ok(_) => self.ok_unless_failed(),
+            Err(error) => {
+                self.state = WriterState::Failed;
+                Err(Box::new(error))
+            }
+        }
     }
 
     /// Close LHEF output
@@ -980,8 +983,11 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn finish(&mut self) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "finish")?;
-        self.write(LHEF_LAST_LINE)?;
-        self.write("\n")?;
+        let output = String::from(LHEF_LAST_LINE) + "\n";
+        if let Err(error) = self.stream.write_all(output.as_bytes()) {
+            self.state = WriterState::Failed;
+            return Err(Box::new(error))
+        }
         if self.state != WriterState::Failed {
             self.state = WriterState::Finished
         }
