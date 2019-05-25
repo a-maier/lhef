@@ -30,7 +30,6 @@ lhef = "0.3"
 # Examples
 
 ```rust,no_run
-extern crate lhef;
 use lhef::Reader;
 use std::fs::File;
 use std::io::BufReader;
