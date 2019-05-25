@@ -24,12 +24,7 @@ Add this to your Cargo.toml:
 
 ```toml
 [dependencies]
-lhef = "0.2.0"
-```
-
-and this to your crate root:
-```rust
-extern crate lhef;
+lhef = "0.3"
 ```
 
 # Examples

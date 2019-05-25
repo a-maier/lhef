@@ -1,3 +1,7 @@
+# Version 0.3.0
+
+- Update to Rust 2018 (1.35.0)
+
 # Version 0.2.0
 
 - Implemented a writer
