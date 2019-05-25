@@ -16,16 +16,16 @@ use std::ops::Drop;
 
 pub type XmlTree = xmltree::Element;
 
-const LHEF_TAG_OPEN: &'static str = "<LesHouchesEvents version=";
-const COMMENT_START: &'static str = "<!--";
-const COMMENT_END: &'static str = "-->";
-const HEADER_START: &'static str = "<header";
-const HEADER_END: &'static str = "</header>";
-const INIT_START: &'static str = "<init";
-const INIT_END: &'static str = "</init>";
-const EVENT_START: &'static str = "<event";
-const EVENT_END: &'static str = "</event>";
-const LHEF_LAST_LINE: &'static str = "</LesHouchesEvents>";
+const LHEF_TAG_OPEN: &str = "<LesHouchesEvents version=";
+const COMMENT_START: &str = "<!--";
+const COMMENT_END: &str = "-->";
+const HEADER_START: &str = "<header";
+const HEADER_END: &str = "</header>";
+const INIT_START: &str = "<init";
+const INIT_END: &str = "</init>";
+const EVENT_START: &str = "<event";
+const EVENT_END: &str = "</event>";
+const LHEF_LAST_LINE: &str = "</LesHouchesEvents>";
 
 pub type XmlAttr = HashMap<String, String>;
 
