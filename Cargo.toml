@@ -2,6 +2,7 @@
 name = "lhef"
 version = "0.2.0"
 authors = ["Andreas Maier <andreas.martin.maier@desy.de>"]
+edition = "2018"
 description = "Read and write files in the Les Houches Event File format"
 readme = "Readme.md"
 license = "GPL-3.0-or-later"
