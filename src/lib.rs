@@ -1090,7 +1090,6 @@ mod writer_tests {
     use super::*;
     use std::collections::HashMap;
     use std::io;
-    use std::str;
 
     #[test]
     fn write() {
