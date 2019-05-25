@@ -6,13 +6,13 @@ extern crate xmltree;
 #[macro_use]
 extern crate itertools;
 
+use std::collections::HashMap;
+use std::error;
 use std::fmt;
 use std::fmt::Write as FmtWrite;
-use std::str;
-use std::error;
-use std::io::{BufRead,Write};
-use std::collections::HashMap;
+use std::io::{BufRead, Write};
 use std::ops::Drop;
+use std::str;
 
 pub type XmlTree = xmltree::Element;
 
@@ -34,7 +34,7 @@ pub type XmlAttr = HashMap<String, String>;
 /// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(PartialEq,Debug,Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct HEPRUP {
     /// Beam IDs
     pub IDBMUP: [i32; 2],
@@ -67,8 +67,8 @@ pub struct HEPRUP {
 /// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
 #[allow(non_snake_case)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(PartialEq,Debug,Clone)]
-pub struct HEPEUP{
+#[derive(PartialEq, Debug, Clone)]
+pub struct HEPEUP {
     /// Number of particles
     pub NUP: i32,
     /// Process ID
@@ -102,7 +102,7 @@ pub struct HEPEUP{
 }
 
 /// Reader for the LHEF format
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Reader<T> {
     stream: T,
     version: &'static str,
@@ -111,7 +111,7 @@ pub struct Reader<T> {
     heprup: HEPRUP,
 }
 
-#[derive(Debug,PartialEq,Clone,Eq,Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 enum ParseError {
     BadFirstLine(String),
     BadHeaderStart(String),
@@ -138,7 +138,13 @@ impl<T: BufRead> Reader<T> {
         let version = parse_version(&mut stream)?;
         let (header, xml_header, init_start) = parse_header(&mut stream)?;
         let heprup = parse_init(&init_start, &mut stream)?;
-        Ok(Reader{stream, version, header, xml_header, heprup})
+        Ok(Reader {
+            stream,
+            version,
+            header,
+            xml_header,
+            heprup,
+        })
     }
 
     /// Get the LHEF version
@@ -181,45 +187,43 @@ impl<T: BufRead> Reader<T> {
         self.stream.read_line(&mut line)?;
         if line.starts_with(EVENT_START) {
             Ok(Some(parse_event(&line, &mut self.stream)?))
-        }
-        else if line.trim() == LHEF_LAST_LINE {
+        } else if line.trim() == LHEF_LAST_LINE {
             Ok(None)
-        }
-        else {
+        } else {
             Err(Box::new(ParseError::BadEventStart(line)))
         }
     }
 }
 
-fn parse_version<T: BufRead>(stream: &mut T) -> Result<&'static str, Box<error::Error>> {
+fn parse_version<T: BufRead>(
+    stream: &mut T,
+) -> Result<&'static str, Box<error::Error>> {
     use self::ParseError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
     let line_cp = first_line.clone();
     let mut line_entries = first_line.trim().split('"');
     if line_entries.next() != Some(LHEF_TAG_OPEN) {
-        return Err(Box::new(ParseError::BadFirstLine(line_cp)))
+        return Err(Box::new(ParseError::BadFirstLine(line_cp)));
     };
     let version = match line_entries.next() {
-        Some("1.0") => {"1.0"},
-        Some("2.0") => {"2.0"},
-        Some("3.0") => {"3.0"},
+        Some("1.0") => "1.0",
+        Some("2.0") => "2.0",
+        Some("3.0") => "3.0",
         Some(version) => {
             return Err(Box::new(UnsupportedVersion(version.to_string())))
         }
-        None => {
-            return Err(Box::new(MissingVersion))
-        }
+        None => return Err(Box::new(MissingVersion)),
     };
     if line_entries.next() != Some(">") {
-        return Err(Box::new(ParseError::BadFirstLine(line_cp)))
+        return Err(Box::new(ParseError::BadFirstLine(line_cp)));
     };
     Ok(version)
 }
 
-fn parse_header<T: BufRead>(mut stream: &mut T) ->
-    Result<(String, Option<XmlTree>, String), Box<error::Error>>
-{
+fn parse_header<T: BufRead>(
+    mut stream: &mut T,
+) -> Result<(String, Option<XmlTree>, String), Box<error::Error>> {
     use self::ParseError::BadHeaderStart;
     let mut header = String::new();
     let mut xml_header = None;
@@ -228,20 +232,17 @@ fn parse_header<T: BufRead>(mut stream: &mut T) ->
         stream.read_line(&mut header_text)?;
         if header_text.trim_start().starts_with(COMMENT_START) {
             if header_text.trim() != COMMENT_START {
-                return Err(Box::new(BadHeaderStart(header_text)))
+                return Err(Box::new(BadHeaderStart(header_text)));
             }
             read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
             header = header_text;
-        }
-        else if header_text.trim_start().starts_with(HEADER_START) {
+        } else if header_text.trim_start().starts_with(HEADER_START) {
             read_lines_until(&mut stream, &mut header_text, HEADER_END)?;
             xml_header = Some(XmlTree::parse(header_text.as_bytes())?);
-        }
-        else if header_text.trim_start().starts_with(INIT_START) {
-            return Ok((header, xml_header, header_text))
-        }
-        else {
-            return Err(Box::new(ParseError::BadHeaderStart(header_text)))
+        } else if header_text.trim_start().starts_with(INIT_START) {
+            return Ok((header, xml_header, header_text));
+        } else {
+            return Err(Box::new(ParseError::BadHeaderStart(header_text)));
         }
     }
 }
@@ -254,25 +255,29 @@ fn pop_line(s: &mut String) {
 }
 
 fn read_lines_until<T: BufRead>(
-    stream: &mut T, header: &mut String, header_end: &str
+    stream: &mut T,
+    header: &mut String,
+    header_end: &str,
 ) -> Result<(), Box<error::Error>> {
     loop {
         if stream.read_line(header)? == 0 {
             return Err(Box::new(ParseError::EndOfFile("header")));
         }
         if header.lines().last().unwrap().trim() == header_end {
-            return Ok(())
+            return Ok(());
         }
     }
 }
 
 fn parse<T>(name: &str, text: Option<&str>) -> Result<T, Box<error::Error>>
-where T: str::FromStr {
+where
+    T: str::FromStr,
+{
     use self::ParseError::*;
     let text: &str = text.ok_or(Box::new(MissingEntry(String::from(name))))?;
     match text.parse::<T>() {
         Ok(t) => Ok(t),
-        Err(_) => Err(Box::new(ConversionError(text.to_owned())))
+        Err(_) => Err(Box::new(ConversionError(text.to_owned()))),
     }
 }
 
@@ -283,11 +288,11 @@ fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
         return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
     }
     let len = tag.len();
-    let tag = &tag[..len-1];
+    let tag = &tag[..len - 1];
     let first_attr = tag.find(char::is_whitespace);
     let tag = match first_attr {
         None => return Ok(""),
-        Some(idx) => &tag[idx+1..],
+        Some(idx) => &tag[idx + 1..],
     };
     Ok(tag.trim_start())
 }
@@ -297,7 +302,9 @@ struct Attr<'a> {
     value: &'a str,
 }
 
-fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> {
+fn next_attr(
+    attr_str: &str,
+) -> Result<(Option<Attr>, &str), Box<error::Error>> {
     use self::ParseError::BadXmlTag;
     let mut rem = attr_str;
     let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
@@ -306,7 +313,7 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
         Some(idx) => &rem[..idx],
     };
     rem = rem[name.len()..].trim_start();
-    if ! rem.starts_with('=') {
+    if !rem.starts_with('=') {
         return Err(Box::new(BadXmlTag(attr_str.to_owned())));
     }
     rem = rem[1..].trim_start();
@@ -321,31 +328,32 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
         Some(idx) => &rem[..idx],
         None => return Err(Box::new(BadXmlTag(attr_str.to_owned()))),
     };
-    rem = &rem[value.len()+1..].trim_start();
-    let attr = Attr{name, value};
+    rem = &rem[value.len() + 1..].trim_start();
+    let attr = Attr { name, value };
     Ok((Some(attr), rem))
 }
 
 fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
-        let mut attr_str = extract_xml_attr_str(xml_tag)?;
-        let mut attr = XmlAttr::new();
-        loop {
-            let (parsed, rem) = next_attr(attr_str)?;
-            match parsed {
-                None => return Ok(attr),
-                Some(next_attr) => {
-                    let name = next_attr.name.to_string();
-                    let value = next_attr.value.to_string();
-                    attr.insert(name, value);
-                },
-            };
-            attr_str = rem;
-        }
+    let mut attr_str = extract_xml_attr_str(xml_tag)?;
+    let mut attr = XmlAttr::new();
+    loop {
+        let (parsed, rem) = next_attr(attr_str)?;
+        match parsed {
+            None => return Ok(attr),
+            Some(next_attr) => {
+                let name = next_attr.name.to_string();
+                let value = next_attr.value.to_string();
+                attr.insert(name, value);
+            }
+        };
+        attr_str = rem;
+    }
 }
 
 #[allow(non_snake_case)]
 fn parse_init<T: BufRead>(
-    init_open: &str, stream: &mut T
+    init_open: &str,
+    stream: &mut T,
 ) -> Result<HEPRUP, Box<error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
@@ -376,10 +384,13 @@ fn parse_init<T: BufRead>(
         let mut line = String::new();
         stream.read_line(&mut line)?;
         let mut entries = line.split_whitespace();
-        XSECUP.push(parse::<f64>(&format!("XSECUP({})", i+1), entries.next())?);
-        XERRUP.push(parse::<f64>(&format!("XERRUP({})", i+1), entries.next())?);
-        XMAXUP.push(parse::<f64>(&format!("XMAXUP({})", i+1), entries.next())?);
-        LPRUP.push(parse::<i32> (&format!("LPRUP({})", i+1), entries.next())?);
+        XSECUP
+            .push(parse::<f64>(&format!("XSECUP({})", i + 1), entries.next())?);
+        XERRUP
+            .push(parse::<f64>(&format!("XERRUP({})", i + 1), entries.next())?);
+        XMAXUP
+            .push(parse::<f64>(&format!("XMAXUP({})", i + 1), entries.next())?);
+        LPRUP.push(parse::<i32>(&format!("LPRUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
     loop {
@@ -392,16 +403,26 @@ fn parse_init<T: BufRead>(
         }
     }
     let attr = extract_xml_attr(init_open)?;
-    Ok(HEPRUP{
-        IDBMUP, EBMUP, PDFGUP, PDFSUP, IDWTUP, NPRUP,
-        XSECUP, XERRUP, XMAXUP, LPRUP,
-        info, attr
+    Ok(HEPRUP {
+        IDBMUP,
+        EBMUP,
+        PDFGUP,
+        PDFSUP,
+        IDWTUP,
+        NPRUP,
+        XSECUP,
+        XERRUP,
+        XMAXUP,
+        LPRUP,
+        info,
+        attr,
     })
 }
 
 #[allow(non_snake_case)]
 fn parse_event<T: BufRead>(
-    event_open: &str, stream: &mut T
+    event_open: &str,
+    stream: &mut T,
 ) -> Result<HEPEUP, Box<error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
@@ -423,25 +444,27 @@ fn parse_event<T: BufRead>(
         let mut line = String::new();
         stream.read_line(&mut line)?;
         let mut entries = line.split_whitespace();
-        IDUP.push(parse::<i32>(&format!("IDUP({})", i+1), entries.next())?);
-        ISTUP.push(parse::<i32>(&format!("ISTUP({})", i+1), entries.next())?);
+        IDUP.push(parse::<i32>(&format!("IDUP({})", i + 1), entries.next())?);
+        ISTUP.push(parse::<i32>(&format!("ISTUP({})", i + 1), entries.next())?);
         MOTHUP.push([
-            parse::<i32>(&format!("MOTHUP({}, 1)", i+1), entries.next())?,
-            parse::<i32>(&format!("MOTHUP({}, 2)", i+1), entries.next())?,
+            parse::<i32>(&format!("MOTHUP({}, 1)", i + 1), entries.next())?,
+            parse::<i32>(&format!("MOTHUP({}, 2)", i + 1), entries.next())?,
         ]);
         ICOLUP.push([
-            parse::<i32>(&format!("ICOLUP({}, 1)", i+1), entries.next())?,
-            parse::<i32>(&format!("ICOLUP({}, 2)", i+1), entries.next())?,
+            parse::<i32>(&format!("ICOLUP({}, 1)", i + 1), entries.next())?,
+            parse::<i32>(&format!("ICOLUP({}, 2)", i + 1), entries.next())?,
         ]);
         PUP.push([
-            parse::<f64>(&format!("PUP({}, 1)", i+1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 2)", i+1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 3)", i+1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 4)", i+1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 5)", i+1), entries.next())?,
+            parse::<f64>(&format!("PUP({}, 1)", i + 1), entries.next())?,
+            parse::<f64>(&format!("PUP({}, 2)", i + 1), entries.next())?,
+            parse::<f64>(&format!("PUP({}, 3)", i + 1), entries.next())?,
+            parse::<f64>(&format!("PUP({}, 4)", i + 1), entries.next())?,
+            parse::<f64>(&format!("PUP({}, 5)", i + 1), entries.next())?,
         ]);
-        VTIMUP.push(parse::<f64>(&format!("VTIMUP({})", i+1), entries.next())?);
-        SPINUP.push(parse::<f64>(&format!("SPINUP({})", i+1), entries.next())?);
+        VTIMUP
+            .push(parse::<f64>(&format!("VTIMUP({})", i + 1), entries.next())?);
+        SPINUP
+            .push(parse::<f64>(&format!("SPINUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
     loop {
@@ -454,10 +477,22 @@ fn parse_event<T: BufRead>(
         }
     }
     let attr = extract_xml_attr(event_open)?;
-    Ok(HEPEUP{
-        NUP, IDRUP, XWGTUP, SCALUP, AQEDUP, AQCDUP,
-        IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP,
-        info, attr,
+    Ok(HEPEUP {
+        NUP,
+        IDRUP,
+        XWGTUP,
+        SCALUP,
+        AQEDUP,
+        AQCDUP,
+        IDUP,
+        ISTUP,
+        MOTHUP,
+        ICOLUP,
+        PUP,
+        VTIMUP,
+        SPINUP,
+        info,
+        attr,
     })
 }
 
@@ -465,53 +500,37 @@ impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ParseError::*;
         match *self {
-            BadFirstLine(ref line) => {
-                write!(
-                    f,
-                    "First line '{}' in input does start with '{}'",
-                    line, LHEF_TAG_OPEN
-                )
-            },
-            BadHeaderStart(ref line) => {
-                write!(
-                    f,
-                    "Encountered unrecognized line '{}', \
-                     expected a header starting with '{}', '{}', \
-                     or the init block starting with '{}'",
-                    line, COMMENT_START, HEADER_START, INIT_START
-                )
-            },
+            BadFirstLine(ref line) => write!(
+                f,
+                "First line '{}' in input does start with '{}'",
+                line, LHEF_TAG_OPEN
+            ),
+            BadHeaderStart(ref line) => write!(
+                f,
+                "Encountered unrecognized line '{}', \
+                 expected a header starting with '{}', '{}', \
+                 or the init block starting with '{}'",
+                line, COMMENT_START, HEADER_START, INIT_START
+            ),
             BadXmlTag(ref line) => {
-                write!(
-                    f,
-                    "Encountered malformed xml tag: '{}'",
-                    line
-                )
-            },
-            BadEventStart(ref line) => {
-                write!(
-                    f,
-                    "Encountered unrecognized line '{}', \
-                     expected an event starting with '{}'",
-                    line, EVENT_START
-                )
-            },
-            UnsupportedVersion(ref version) => {
-                write!(
-                    f,
-                    "Unsupported version {}, only 1.0, 2.0, 3.0 are supported",
-                    version
-                )
-            },
-            MissingVersion => {
-                write!(f, "Version information missing")
+                write!(f, "Encountered malformed xml tag: '{}'", line)
             }
-            MissingEntry(ref entry) => {
-                write!(f, "Missing entry '{}'", entry)
-            },
+            BadEventStart(ref line) => write!(
+                f,
+                "Encountered unrecognized line '{}', \
+                 expected an event starting with '{}'",
+                line, EVENT_START
+            ),
+            UnsupportedVersion(ref version) => write!(
+                f,
+                "Unsupported version {}, only 1.0, 2.0, 3.0 are supported",
+                version
+            ),
+            MissingVersion => write!(f, "Version information missing"),
+            MissingEntry(ref entry) => write!(f, "Missing entry '{}'", entry),
             ConversionError(ref entry) => {
                 write!(f, "Failed to convert to number: '{}'", entry)
-            },
+            }
             EndOfFile(ref block) => {
                 write!(f, "Encountered '{}' block without closing tag", block)
             }
@@ -568,14 +587,14 @@ fn xml_to_string(xml: &XmlTree, output: &mut String) {
 /// ```
 /// It is important to keep the proper order of method calls and to call
 /// finish() at the end.
-#[derive(Debug,PartialEq,Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Writer<T: Write> {
     stream: T,
     state: WriterState,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug,Clone,Hash,PartialEq,Eq,Copy)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Copy)]
 // State of LHEF writer
 enum WriterState {
     // The next object to be written should be a header or an init block
@@ -589,7 +608,7 @@ enum WriterState {
     Failed,
 }
 
-#[derive(Debug,Clone,Hash,PartialEq,Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum WriteError {
     MismatchedSubprocesses,
     MismatchedParticles,
@@ -601,34 +620,26 @@ impl fmt::Display for WriteError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::WriteError::*;
         match *self {
-            MismatchedSubprocesses => {
-                write!(
-                    f,
-                    "Mismatch between NPRUP and length of at least one of \
-                     XSECUP, XERRUP, XMAXUP, LPRUP."
-                )
-            },
-            MismatchedParticles => {
-                write!(
-                    f,
-                    "Mismatch between NUP and length of at least one of \
-                     IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP."
-                )
-            },
-            BadState(ref state, attempt) => {
-                write!(
-                    f,
-                    "Writer is in state '{:?}', cannot write '{}'.",
-                    state, attempt
-                )
-            },
-            WriteToFailed => {
-                write!(
-                    f,
-                    "Writer is in 'Failed' state. \
-                     Output was written, but the file may be broken anyway."
-                )
-            }
+            MismatchedSubprocesses => write!(
+                f,
+                "Mismatch between NPRUP and length of at least one of \
+                 XSECUP, XERRUP, XMAXUP, LPRUP."
+            ),
+            MismatchedParticles => write!(
+                f,
+                "Mismatch between NUP and length of at least one of \
+                 IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP."
+            ),
+            BadState(ref state, attempt) => write!(
+                f,
+                "Writer is in state '{:?}', cannot write '{}'.",
+                state, attempt
+            ),
+            WriteToFailed => write!(
+                f,
+                "Writer is in 'Failed' state. \
+                 Output was written, but the file may be broken anyway."
+            ),
         }
     }
 }
@@ -666,21 +677,25 @@ impl<T: Write> Writer<T> {
     /// ).unwrap();
     /// ```
     pub fn new(
-        mut stream: T, version: &str
-    ) -> Result<Writer<T>, Box<error::Error>>
-    {
+        mut stream: T,
+        version: &str,
+    ) -> Result<Writer<T>, Box<error::Error>> {
         let output = String::from(LHEF_TAG_OPEN) + "\"" + version + "\">\n";
         stream.write_all(output.as_bytes())?;
-        Ok(Writer{stream, state: WriterState::ExpectingHeaderOrInit})
+        Ok(Writer {
+            stream,
+            state: WriterState::ExpectingHeaderOrInit,
+        })
     }
 
     fn assert_state(
-        &self, expected: WriterState, from: &'static str
+        &self,
+        expected: WriterState,
+        from: &'static str,
     ) -> Result<(), Box<error::Error>> {
         if self.state != expected && self.state != WriterState::Failed {
             Err(Box::new(WriteError::BadState(self.state, from)))
-        }
-        else {
+        } else {
             Ok(())
         }
     }
@@ -688,8 +703,7 @@ impl<T: Write> Writer<T> {
     fn ok_unless_failed(&self) -> Result<(), Box<error::Error>> {
         if self.state == WriterState::Failed {
             Err(Box::new(WriteError::WriteToFailed))
-        }
-        else {
+        } else {
             Ok(())
         }
     }
@@ -706,9 +720,12 @@ impl<T: Write> Writer<T> {
     /// ```
     pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
-        let output =
-            String::from(COMMENT_START) + "\n" + header
-            + "\n" + COMMENT_END + "\n";
+        let output = String::from(COMMENT_START)
+            + "\n"
+            + header
+            + "\n"
+            + COMMENT_END
+            + "\n";
         match self.stream.write_all(output.as_bytes()) {
             Ok(_) => self.ok_unless_failed(),
             Err(error) => {
@@ -749,7 +766,8 @@ impl<T: Write> Writer<T> {
     /// writer.xml_header(&header).unwrap();
     /// ```
     pub fn xml_header(
-        &mut self, header: &XmlTree
+        &mut self,
+        header: &XmlTree,
     ) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
         let mut output = String::from(HEADER_START);
@@ -757,8 +775,7 @@ impl<T: Write> Writer<T> {
             output += ">\n";
             xml_to_string(&header, &mut output);
             output += "\n";
-        }
-        else {
+        } else {
             for (key, value) in &header.attributes {
                 write!(&mut output, " {}=\"{}\"", key, value)?;
             }
@@ -819,17 +836,17 @@ impl<T: Write> Writer<T> {
     /// writer.heprup(&heprup).unwrap();
     /// ```
     pub fn heprup(
-        &mut self, runinfo: &HEPRUP
+        &mut self,
+        runinfo: &HEPRUP,
     ) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "init")?;
         let num_sub = runinfo.NPRUP as usize;
-        if
-            num_sub != runinfo.XSECUP.len()
+        if num_sub != runinfo.XSECUP.len()
             || num_sub != runinfo.XERRUP.len()
             || num_sub != runinfo.XMAXUP.len()
             || num_sub != runinfo.LPRUP.len()
         {
-            return Err(Box::new(WriteError::MismatchedSubprocesses))
+            return Err(Box::new(WriteError::MismatchedSubprocesses));
         }
         let mut output = String::from(INIT_START);
         for (attr, value) in &runinfo.attr {
@@ -851,7 +868,10 @@ impl<T: Write> Writer<T> {
         write!(&mut output, "{} ", runinfo.IDWTUP)?;
         writeln!(&mut output, "{}", runinfo.NPRUP)?;
         let subprocess_infos = izip!(
-            &runinfo.XSECUP, &runinfo.XERRUP, &runinfo.XMAXUP, &runinfo.LPRUP
+            &runinfo.XSECUP,
+            &runinfo.XERRUP,
+            &runinfo.XMAXUP,
+            &runinfo.LPRUP
         );
         for (xs, xserr, xsmax, id) in subprocess_infos {
             writeln!(&mut output, "{} {} {} {}", xs, xserr, xsmax, id)?;
@@ -866,7 +886,7 @@ impl<T: Write> Writer<T> {
         output += "\n";
         if let Err(error) = self.stream.write_all(output.as_bytes()) {
             self.state = WriterState::Failed;
-            return Err(Box::new(error))
+            return Err(Box::new(error));
         }
         if self.state != WriterState::Failed {
             self.state = WriterState::ExpectingEventOrFinish
@@ -908,13 +928,10 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.hepeup(&hepeup).unwrap();
     /// ```
-    pub fn hepeup(
-        &mut self, event: &HEPEUP
-    ) -> Result<(), Box<error::Error>> {
+    pub fn hepeup(&mut self, event: &HEPEUP) -> Result<(), Box<error::Error>> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
-        if
-               num_particles != event.IDUP.len()
+        if num_particles != event.IDUP.len()
             || num_particles != event.ISTUP.len()
             || num_particles != event.MOTHUP.len()
             || num_particles != event.ICOLUP.len()
@@ -922,7 +939,7 @@ impl<T: Write> Writer<T> {
             || num_particles != event.VTIMUP.len()
             || num_particles != event.SPINUP.len()
         {
-            return Err(Box::new(WriteError::MismatchedParticles))
+            return Err(Box::new(WriteError::MismatchedParticles));
         }
         let mut output = String::from(EVENT_START);
         for (attr, value) in &event.attr {
@@ -930,14 +947,24 @@ impl<T: Write> Writer<T> {
         }
         output += ">\n";
         write!(
-            &mut output, "{} {} {} {} {} {} ",
-            event.NUP, event.IDRUP, event.XWGTUP,
-            event.SCALUP, event.AQEDUP, event.AQCDUP
+            &mut output,
+            "{} {} {} {} {} {} ",
+            event.NUP,
+            event.IDRUP,
+            event.XWGTUP,
+            event.SCALUP,
+            event.AQEDUP,
+            event.AQCDUP
         )?;
         output += ">\n";
         let particles = izip!(
-            &event.IDUP, &event.ISTUP, &event.MOTHUP, &event.ICOLUP,
-            &event.PUP, &event.VTIMUP, &event.SPINUP,
+            &event.IDUP,
+            &event.ISTUP,
+            &event.MOTHUP,
+            &event.ICOLUP,
+            &event.PUP,
+            &event.VTIMUP,
+            &event.SPINUP,
         );
         for (id, status, mothers, colour, p, lifetime, spin) in particles {
             write!(&mut output, "{} {} ", id, status)?;
@@ -986,7 +1013,7 @@ impl<T: Write> Writer<T> {
         let output = String::from(LHEF_LAST_LINE) + "\n";
         if let Err(error) = self.stream.write_all(output.as_bytes()) {
             self.state = WriterState::Failed;
-            return Err(Box::new(error))
+            return Err(Box::new(error));
         }
         if self.state != WriterState::Failed {
             self.state = WriterState::Finished
@@ -1008,9 +1035,9 @@ mod reader_tests {
     extern crate flate2;
     use super::*;
 
+    use reader_tests::flate2::bufread::GzDecoder;
     use std::fs::File;
     use std::io::BufReader;
-    use reader_tests::flate2::bufread::GzDecoder;
 
     #[test]
     fn read_correct() {
@@ -1026,13 +1053,16 @@ mod reader_tests {
         }
         assert!(lhef.heprup().attr.is_empty());
         let mut nevents = 0;
-        while let Ok(Some(_)) = lhef.hepeup() { nevents += 1 };
+        while let Ok(Some(_)) = lhef.hepeup() {
+            nevents += 1
+        }
         assert_eq!(nevents, 1628);
     }
 
     #[test]
     fn read_hejfog() {
-        let file = File::open("test_data/HEJFOG.lhe.gz").expect("file not found");
+        let file =
+            File::open("test_data/HEJFOG.lhe.gz").expect("file not found");
         let reader = BufReader::new(GzDecoder::new(BufReader::new(file)));
         let mut lhef = Reader::new(reader).unwrap();
         {
@@ -1048,7 +1078,9 @@ mod reader_tests {
         };
         assert_eq!(first_event.attr, expected_attr);
         let mut nevents = 1;
-        while let Ok(Some(_)) = lhef.hepeup() { nevents += 1 };
+        while let Ok(Some(_)) = lhef.hepeup() {
+            nevents += 1
+        }
         assert_eq!(nevents, 10);
     }
 }
@@ -1056,8 +1088,8 @@ mod reader_tests {
 #[cfg(test)]
 mod writer_tests {
     use super::*;
-    use std::io;
     use std::collections::HashMap;
+    use std::io;
     use std::str;
 
     #[test]
@@ -1069,10 +1101,10 @@ mod writer_tests {
             PDFSUP: [230000, 230000],
             IDWTUP: 2,
             NPRUP: 1,
-            XSECUP: vec!(120588124.02),
-            XERRUP: vec!(702517.48228),
-            XMAXUP: vec!(94290.49),
-            LPRUP:  vec!(1),
+            XSECUP: vec![120588124.02],
+            XERRUP: vec![702517.48228],
+            XMAXUP: vec![94290.49],
+            LPRUP: vec![1],
             info: String::new(),
             attr: XmlAttr::new(),
         };
@@ -1083,18 +1115,24 @@ mod writer_tests {
             SCALUP: 91.188,
             AQEDUP: 0.007546771,
             AQCDUP: 0.1190024,
-            IDUP: vec!(1, 21, 21, 1),
-            ISTUP: vec!(-1, -1, 1, 1),
-            MOTHUP: vec!([0, 0], [0, 0], [1, 2], [1, 2]),
-            ICOLUP: vec!([503, 0], [501, 502], [503, 502], [501, 0]),
-            PUP: vec!(
+            IDUP: vec![1, 21, 21, 1],
+            ISTUP: vec![-1, -1, 1, 1],
+            MOTHUP: vec![[0, 0], [0, 0], [1, 2], [1, 2]],
+            ICOLUP: vec![[503, 0], [501, 502], [503, 502], [501, 0]],
+            PUP: vec![
                 [0.0, 0.0, 4.7789443449, 4.7789443449, 0.0],
                 [0.0, 0.0, -1240.3761329, 1240.3761329, 0.0],
                 [37.283715118, 21.98166528, -1132.689358, 1133.5159684, 0.0],
-                [-37.283715118, -21.98166528, -102.90783056, 111.63910879, 0.0]
-            ),
-            VTIMUP: vec!(0.0, 0.0, 0.0, 0.0),
-            SPINUP: vec!(1.0, -1.0, -1.0, 1.0),
+                [
+                    -37.283715118,
+                    -21.98166528,
+                    -102.90783056,
+                    111.63910879,
+                    0.0,
+                ],
+            ],
+            VTIMUP: vec![0.0, 0.0, 0.0, 0.0],
+            SPINUP: vec![1.0, -1.0, -1.0, 1.0],
             info: String::from(
                 "<mgrwt>
 <rscale>  2 0.91188000E+02</rscale>
@@ -1103,21 +1141,20 @@ mod writer_tests {
 <pdfrwt beam=\"2\">  1        1 0.68270633E-03 0.91188000E+02</pdfrwt>
 <totfact> 0.49322010E+04</totfact>
 </mgrwt>
-"
+",
             ),
             attr: XmlAttr::new(),
         };
         let mut buf = vec![];
         {
-            let mut writer = Writer::new(
-                io::Cursor::new(&mut buf), "1.0"
-            ).unwrap();
+            let mut writer =
+                Writer::new(io::Cursor::new(&mut buf), "1.0").unwrap();
             writer.header("some header").unwrap();
             let header = {
                 let mut attr = HashMap::new();
                 attr.insert("attr0".to_string(), "val0".to_string());
                 attr.insert("attr1".to_string(), "".to_string());
-                XmlTree{
+                XmlTree {
                     prefix: None,
                     namespace: None,
                     namespaces: None,
@@ -1141,27 +1178,25 @@ mod tests {
     extern crate flate2;
 
     use super::*;
-    use std::io;
     use std::fs;
+    use std::io;
     use tests::flate2::bufread::GzDecoder;
 
     #[test]
     fn test_read_write() {
         let mut reader = {
-            let file = fs::File::open(
-                "test_data/2j.lhe.gz"
-            ).expect("file not found");
-            let reader = io::BufReader::new(
-                GzDecoder::new(io::BufReader::new(file))
-            );
+            let file =
+                fs::File::open("test_data/2j.lhe.gz").expect("file not found");
+            let reader =
+                io::BufReader::new(GzDecoder::new(io::BufReader::new(file)));
             Reader::new(reader).unwrap()
         };
         let mut output = Vec::new();
         let mut events = Vec::new();
         {
-            let mut writer = Writer::new(
-                io::Cursor::new(&mut output), reader.version()
-            ).unwrap();
+            let mut writer =
+                Writer::new(io::Cursor::new(&mut output), reader.version())
+                    .unwrap();
             if let Some(header) = reader.xml_header() {
                 writer.xml_header(header).unwrap();
             }
