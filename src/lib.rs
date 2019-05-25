@@ -226,18 +226,18 @@ fn parse_header<T: BufRead>(mut stream: &mut T) ->
     loop {
         let mut header_text = String::new();
         stream.read_line(&mut header_text)?;
-        if header_text.trim_left().starts_with(COMMENT_START) {
+        if header_text.trim_start().starts_with(COMMENT_START) {
             if header_text.trim() != COMMENT_START {
                 return Err(Box::new(BadHeaderStart(header_text)))
             }
             read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
             header = header_text;
         }
-        else if header_text.trim_left().starts_with(HEADER_START) {
+        else if header_text.trim_start().starts_with(HEADER_START) {
             read_lines_until(&mut stream, &mut header_text, HEADER_END)?;
             xml_header = Some(XmlTree::parse(header_text.as_bytes())?);
         }
-        else if header_text.trim_left().starts_with(INIT_START) {
+        else if header_text.trim_start().starts_with(INIT_START) {
             return Ok((header, xml_header, header_text))
         }
         else {
@@ -289,7 +289,7 @@ fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
         None => return Ok(""),
         Some(idx) => &tag[idx+1..],
     };
-    Ok(tag.trim_left())
+    Ok(tag.trim_start())
 }
 
 struct Attr<'a> {
@@ -305,11 +305,11 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
         None => return Ok((None, rem)),
         Some(idx) => &rem[..idx],
     };
-    rem = rem[name.len()..].trim_left();
+    rem = rem[name.len()..].trim_start();
     if rem.chars().next() != Some('=') {
         return Err(Box::new(BadXmlTag(attr_str.to_owned())));
     }
-    rem = rem[1..].trim_left();
+    rem = rem[1..].trim_start();
     let quote = rem.chars().next();
     if quote != Some('\'') && quote != Some('"') {
         return Err(Box::new(BadXmlTag(attr_str.to_owned())));
@@ -321,7 +321,7 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
         Some(idx) => &rem[..idx],
         None => return Err(Box::new(BadXmlTag(attr_str.to_owned()))),
     };
-    rem = &rem[value.len()+1..].trim_left();
+    rem = &rem[value.len()+1..].trim_start();
     let attr = Attr{name, value};
     Ok((Some(attr), rem))
 }
