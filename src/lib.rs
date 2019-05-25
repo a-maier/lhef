@@ -248,7 +248,7 @@ fn parse_header<T: BufRead>(mut stream: &mut T) ->
 
 fn pop_line(s: &mut String) {
     s.pop();
-    while !s.is_empty() && s.chars().last().unwrap() != '\n' {
+    while !s.is_empty() && !s.ends_with('\n') {
         s.pop();
     }
 }
@@ -279,7 +279,7 @@ where T: str::FromStr {
 fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
     use self::ParseError::BadXmlTag;
     let tag = xml_tag.trim();
-    if tag.chars().last() != Some('>') {
+    if !tag.ends_with('>') {
         return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
     }
     let len = tag.len();
@@ -306,7 +306,7 @@ fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), Box<error::Error>> 
         Some(idx) => &rem[..idx],
     };
     rem = rem[name.len()..].trim_start();
-    if rem.chars().next() != Some('=') {
+    if ! rem.starts_with('=') {
         return Err(Box::new(BadXmlTag(attr_str.to_owned())));
     }
     rem = rem[1..].trim_start();
@@ -772,11 +772,11 @@ impl<T: Write> Writer<T> {
             match header.text {
                 None => output += "\n",
                 Some(ref text) => {
-                    if header.children.is_empty() && !text.starts_with("\n") {
+                    if header.children.is_empty() && !text.starts_with('\n') {
                         output += "\n"
                     }
                     output += text;
-                    if !text.ends_with("\n") {
+                    if !text.ends_with('\n') {
                         output += "\n";
                     }
                 }
@@ -849,16 +849,16 @@ impl<T: Write> Writer<T> {
             write!(&mut output, "{} ", entry)?;
         }
         write!(&mut output, "{} ", runinfo.IDWTUP)?;
-        write!(&mut output, "{}\n", runinfo.NPRUP)?;
+        writeln!(&mut output, "{}", runinfo.NPRUP)?;
         let subprocess_infos = izip!(
             &runinfo.XSECUP, &runinfo.XERRUP, &runinfo.XMAXUP, &runinfo.LPRUP
         );
         for (xs, xserr, xsmax, id) in subprocess_infos {
-            write!(&mut output, "{} {} {} {}\n", xs, xserr, xsmax, id)?;
+            writeln!(&mut output, "{} {} {} {}", xs, xserr, xsmax, id)?;
         }
         if !runinfo.info.is_empty() {
             output += &runinfo.info;
-            if runinfo.info.chars().last() != Some('\n') {
+            if !runinfo.info.ends_with('\n') {
                 output += "\n"
             }
         }
@@ -950,11 +950,11 @@ impl<T: Write> Writer<T> {
             for p in p {
                 write!(&mut output, "{} ", p)?;
             }
-            write!(&mut output, "{} {}\n", lifetime, spin)?;
+            writeln!(&mut output, "{} {}", lifetime, spin)?;
         }
         if !event.info.is_empty() {
             output += &event.info;
-            if event.info.chars().last() != Some('\n') {
+            if !event.info.ends_with('\n') {
                 output += "\n"
             }
         }
