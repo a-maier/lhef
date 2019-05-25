@@ -274,7 +274,9 @@ where
     T: str::FromStr,
 {
     use self::ParseError::*;
-    let text: &str = text.ok_or(Box::new(MissingEntry(String::from(name))))?;
+    let text: &str = text.ok_or_else(
+        || Box::new(MissingEntry(String::from(name)))
+    )?;
     match text.parse::<T>() {
         Ok(t) => Ok(t),
         Err(_) => Err(Box::new(ConversionError(text.to_owned()))),
