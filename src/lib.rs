@@ -134,7 +134,7 @@ impl<T: BufRead> Reader<T> {
     /// let file = std::io::BufReader::new(file);
     /// let reader = lhef::Reader::new(file).unwrap();
     /// ```
-    pub fn new(mut stream: T) -> Result<Reader<T>, Box<error::Error>> {
+    pub fn new(mut stream: T) -> Result<Reader<T>, Box<dyn error::Error>> {
         let version = parse_version(&mut stream)?;
         let (header, xml_header, init_start) = parse_header(&mut stream)?;
         let heprup = parse_init(&init_start, &mut stream)?;
@@ -182,7 +182,7 @@ impl<T: BufRead> Reader<T> {
     ///    None => println!("Reached end of event file."),
     /// }
     /// ```
-    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, Box<error::Error>> {
+    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, Box<dyn error::Error>> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
         if line.starts_with(EVENT_START) {
@@ -197,7 +197,7 @@ impl<T: BufRead> Reader<T> {
 
 fn parse_version<T: BufRead>(
     stream: &mut T,
-) -> Result<&'static str, Box<error::Error>> {
+) -> Result<&'static str, Box<dyn error::Error>> {
     use self::ParseError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
@@ -223,7 +223,7 @@ fn parse_version<T: BufRead>(
 
 fn parse_header<T: BufRead>(
     mut stream: &mut T,
-) -> Result<(String, Option<XmlTree>, String), Box<error::Error>> {
+) -> Result<(String, Option<XmlTree>, String), Box<dyn error::Error>> {
     use self::ParseError::BadHeaderStart;
     let mut header = String::new();
     let mut xml_header = None;
@@ -258,7 +258,7 @@ fn read_lines_until<T: BufRead>(
     stream: &mut T,
     header: &mut String,
     header_end: &str,
-) -> Result<(), Box<error::Error>> {
+) -> Result<(), Box<dyn error::Error>> {
     loop {
         if stream.read_line(header)? == 0 {
             return Err(Box::new(ParseError::EndOfFile("header")));
@@ -269,7 +269,7 @@ fn read_lines_until<T: BufRead>(
     }
 }
 
-fn parse<T>(name: &str, text: Option<&str>) -> Result<T, Box<error::Error>>
+fn parse<T>(name: &str, text: Option<&str>) -> Result<T, Box<dyn error::Error>>
 where
     T: str::FromStr,
 {
@@ -283,7 +283,7 @@ where
     }
 }
 
-fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<error::Error>> {
+fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<dyn error::Error>> {
     use self::ParseError::BadXmlTag;
     let tag = xml_tag.trim();
     if !tag.ends_with('>') {
@@ -306,7 +306,7 @@ struct Attr<'a> {
 
 fn next_attr(
     attr_str: &str,
-) -> Result<(Option<Attr>, &str), Box<error::Error>> {
+) -> Result<(Option<Attr>, &str), Box<dyn error::Error>> {
     use self::ParseError::BadXmlTag;
     let mut rem = attr_str;
     let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
@@ -335,7 +335,7 @@ fn next_attr(
     Ok((Some(attr), rem))
 }
 
-fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
+fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<dyn error::Error>> {
     let mut attr_str = extract_xml_attr_str(xml_tag)?;
     let mut attr = XmlAttr::new();
     loop {
@@ -356,7 +356,7 @@ fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<error::Error>> {
 fn parse_init<T: BufRead>(
     init_open: &str,
     stream: &mut T,
-) -> Result<HEPRUP, Box<error::Error>> {
+) -> Result<HEPRUP, Box<dyn error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -425,7 +425,7 @@ fn parse_init<T: BufRead>(
 fn parse_event<T: BufRead>(
     event_open: &str,
     stream: &mut T,
-) -> Result<HEPEUP, Box<error::Error>> {
+) -> Result<HEPEUP, Box<dyn error::Error>> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -540,17 +540,7 @@ impl fmt::Display for ParseError {
     }
 }
 
-// TODO
-impl error::Error for ParseError {
-    fn description(&self) -> &str {
-        ""
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
-}
+impl error::Error for ParseError {}
 
 fn xml_to_string(xml: &XmlTree, output: &mut String) {
     *output += "<";
@@ -646,17 +636,7 @@ impl fmt::Display for WriteError {
     }
 }
 
-// TODO
-impl error::Error for WriteError {
-    fn description(&self) -> &str {
-        ""
-    }
-
-    fn cause(&self) -> Option<&error::Error> {
-        // Generic error, underlying cause isn't tracked.
-        None
-    }
-}
+impl error::Error for WriteError {}
 
 impl<T: Write> Writer<T> {
     /// Create a new LHEF writer
@@ -681,7 +661,7 @@ impl<T: Write> Writer<T> {
     pub fn new(
         mut stream: T,
         version: &str,
-    ) -> Result<Writer<T>, Box<error::Error>> {
+    ) -> Result<Writer<T>, Box<dyn error::Error>> {
         let output = String::from(LHEF_TAG_OPEN) + "\"" + version + "\">\n";
         stream.write_all(output.as_bytes())?;
         Ok(Writer {
@@ -694,7 +674,7 @@ impl<T: Write> Writer<T> {
         &self,
         expected: WriterState,
         from: &'static str,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> Result<(), Box<dyn error::Error>> {
         if self.state != expected && self.state != WriterState::Failed {
             Err(Box::new(WriteError::BadState(self.state, from)))
         } else {
@@ -702,7 +682,7 @@ impl<T: Write> Writer<T> {
         }
     }
 
-    fn ok_unless_failed(&self) -> Result<(), Box<error::Error>> {
+    fn ok_unless_failed(&self) -> Result<(), Box<dyn error::Error>> {
         if self.state == WriterState::Failed {
             Err(Box::new(WriteError::WriteToFailed))
         } else {
@@ -720,7 +700,7 @@ impl<T: Write> Writer<T> {
     /// ).unwrap();
     /// writer.header("some header text").unwrap();
     /// ```
-    pub fn header(&mut self, header: &str) -> Result<(), Box<error::Error>> {
+    pub fn header(&mut self, header: &str) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
         let output = String::from(COMMENT_START)
             + "\n"
@@ -770,7 +750,7 @@ impl<T: Write> Writer<T> {
     pub fn xml_header(
         &mut self,
         header: &XmlTree,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
         let mut output = String::from(HEADER_START);
         if header.name != "header" {
@@ -840,7 +820,7 @@ impl<T: Write> Writer<T> {
     pub fn heprup(
         &mut self,
         runinfo: &HEPRUP,
-    ) -> Result<(), Box<error::Error>> {
+    ) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "init")?;
         let num_sub = runinfo.NPRUP as usize;
         if num_sub != runinfo.XSECUP.len()
@@ -930,7 +910,7 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.hepeup(&hepeup).unwrap();
     /// ```
-    pub fn hepeup(&mut self, event: &HEPEUP) -> Result<(), Box<error::Error>> {
+    pub fn hepeup(&mut self, event: &HEPEUP) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
         if num_particles != event.IDUP.len()
@@ -1010,7 +990,7 @@ impl<T: Write> Writer<T> {
     /// // ... write header, run information, events ...
     /// writer.finish().unwrap();
     /// ```
-    pub fn finish(&mut self) -> Result<(), Box<error::Error>> {
+    pub fn finish(&mut self) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "finish")?;
         let output = String::from(LHEF_LAST_LINE) + "\n";
         if let Err(error) = self.stream.write_all(output.as_bytes()) {
