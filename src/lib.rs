@@ -700,7 +700,10 @@ impl<T: Write> Writer<T> {
     /// ).unwrap();
     /// writer.header("some header text").unwrap();
     /// ```
-    pub fn header(&mut self, header: &str) -> Result<(), Box<dyn error::Error>> {
+    pub fn header(
+        &mut self,
+        header: &str
+    ) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
         let output = String::from(COMMENT_START)
             + "\n"
@@ -910,7 +913,10 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.hepeup(&hepeup).unwrap();
     /// ```
-    pub fn hepeup(&mut self, event: &HEPEUP) -> Result<(), Box<dyn error::Error>> {
+    pub fn hepeup(
+        &mut self,
+        event: &HEPEUP
+    ) -> Result<(), Box<dyn error::Error>> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
         if num_particles != event.IDUP.len()
