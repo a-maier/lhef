@@ -1,3 +1,12 @@
+# Version 0.3.2
+
+- Update dependencies
+- Address compiler warnings (Rust 1.46.0)
+
+# Version 0.3.1
+
+- Added license file
+
 # Version 0.3.0
 
 - Update to Rust 2018 (1.35.0)
