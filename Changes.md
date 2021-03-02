@@ -1,3 +1,9 @@
+# Version 0.3.3
+
+- Improve performance by a lot
+- Fix documentation
+- Update `itertools` dependency
+
 # Version 0.3.2
 
 - Update dependencies
