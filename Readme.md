@@ -18,18 +18,9 @@ parsed exactly like for version 1.0. This means that the additional XML
 tags have to be extracted manually from the `info` fields of the
 `HEPRUP` and `HEPEUP` objects.
 
-# Usage
+## Examples
 
-Add this to your Cargo.toml:
-
-```toml
-[dependencies]
-lhef = "0.3"
-```
-
-# Examples
-
-```rust,no_run
+```rust
 use lhef::Reader;
 use std::fs::File;
 use std::io::BufReader;
@@ -42,8 +33,10 @@ println!("Information in comment header:\n{}", reader.header());
 println!("Information in xml header:\n{:?}", reader.xml_header());
 println!("Generator run information:\n{:?}", reader.heprup());
 
-let event = reader.event()?;
+let event = reader.hepeup()?;
 if let Some(event) = event {
     println!("Found an event: {:?}", event);
 }
 ```
+
+License: GPL-3.0-or-later
