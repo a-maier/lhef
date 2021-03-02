@@ -309,13 +309,15 @@ fn read_lines_until<T: BufRead>(
     }
 }
 
-fn parse<T>(name: &str, text: Option<&str>) -> Result<T, Box<dyn error::Error>>
+fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, Box<dyn error::Error>>
 where
     T: str::FromStr,
+    F: FnOnce() ->  S,
+    S: Into<String>
 {
     use self::ParseError::*;
     let text: &str = text.ok_or_else(
-        || Box::new(MissingEntry(String::from(name)))
+        || Box::new(MissingEntry(name().into()))
     )?;
     match text.parse::<T>() {
         Ok(t) => Ok(t),
@@ -401,23 +403,23 @@ fn parse_init<T: BufRead>(
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
     let IDBMUP = [
-        parse::<i32>("IDBMUP(1)", entries.next())?,
-        parse::<i32>("IDBMUP(2)", entries.next())?,
+        parse(|| "IDBMUP(1)", entries.next())?,
+        parse(|| "IDBMUP(2)", entries.next())?,
     ];
     let EBMUP = [
-        parse::<f64>("EBMUP(1)", entries.next())?,
-        parse::<f64>("EBMUP(2)", entries.next())?,
+        parse(|| "EBMUP(1)", entries.next())?,
+        parse(|| "EBMUP(2)", entries.next())?,
     ];
     let PDFGUP = [
-        parse::<i32>("PDFGUP(1)", entries.next())?,
-        parse::<i32>("PDFGUP(2)", entries.next())?,
+        parse(|| "PDFGUP(1)", entries.next())?,
+        parse(|| "PDFGUP(2)", entries.next())?,
     ];
     let PDFSUP = [
-        parse::<i32>("PDFSUP(1)", entries.next())?,
-        parse::<i32>("PDFSUP(2)", entries.next())?,
+        parse(|| "PDFSUP(1)", entries.next())?,
+        parse(|| "PDFSUP(2)", entries.next())?,
     ];
-    let IDWTUP = parse::<i32>("IDWTUP", entries.next())?;
-    let NPRUP = parse::<i32>("NPRUP", entries.next())?;
+    let IDWTUP = parse(|| "IDWTUP", entries.next())?;
+    let NPRUP = parse(|| "NPRUP", entries.next())?;
     let mut XSECUP = Vec::with_capacity(NPRUP as usize);
     let mut XERRUP = Vec::with_capacity(NPRUP as usize);
     let mut XMAXUP = Vec::with_capacity(NPRUP as usize);
@@ -427,12 +429,12 @@ fn parse_init<T: BufRead>(
         stream.read_line(&mut line)?;
         let mut entries = line.split_whitespace();
         XSECUP
-            .push(parse::<f64>(&format!("XSECUP({})", i + 1), entries.next())?);
+            .push(parse(|| format!("XSECUP({})", i + 1), entries.next())?);
         XERRUP
-            .push(parse::<f64>(&format!("XERRUP({})", i + 1), entries.next())?);
+            .push(parse(|| format!("XERRUP({})", i + 1), entries.next())?);
         XMAXUP
-            .push(parse::<f64>(&format!("XMAXUP({})", i + 1), entries.next())?);
-        LPRUP.push(parse::<i32>(&format!("LPRUP({})", i + 1), entries.next())?);
+            .push(parse(|| format!("XMAXUP({})", i + 1), entries.next())?);
+        LPRUP.push(parse(|| format!("LPRUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
     loop {
@@ -469,12 +471,12 @@ fn parse_event<T: BufRead>(
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
-    let NUP = parse::<i32>("NUP", entries.next())?;
-    let IDRUP = parse::<i32>("IDRUP", entries.next())?;
-    let XWGTUP = parse::<f64>("XWGTUP", entries.next())?;
-    let SCALUP = parse::<f64>("SCALUP", entries.next())?;
-    let AQEDUP = parse::<f64>("AQEDUP", entries.next())?;
-    let AQCDUP = parse::<f64>("AQCDUP", entries.next())?;
+    let NUP = parse(|| "NUP", entries.next())?;
+    let IDRUP = parse(|| "IDRUP", entries.next())?;
+    let XWGTUP = parse(|| "XWGTUP", entries.next())?;
+    let SCALUP = parse(|| "SCALUP", entries.next())?;
+    let AQEDUP = parse(|| "AQEDUP", entries.next())?;
+    let AQCDUP = parse(|| "AQCDUP", entries.next())?;
     let mut IDUP = Vec::with_capacity(NUP as usize);
     let mut ISTUP = Vec::with_capacity(NUP as usize);
     let mut MOTHUP = Vec::with_capacity(NUP as usize);
@@ -486,27 +488,27 @@ fn parse_event<T: BufRead>(
         let mut line = String::new();
         stream.read_line(&mut line)?;
         let mut entries = line.split_whitespace();
-        IDUP.push(parse::<i32>(&format!("IDUP({})", i + 1), entries.next())?);
-        ISTUP.push(parse::<i32>(&format!("ISTUP({})", i + 1), entries.next())?);
+        IDUP.push(parse(|| format!("IDUP({})", i + 1), entries.next())?);
+        ISTUP.push(parse(|| format!("ISTUP({})", i + 1), entries.next())?);
         MOTHUP.push([
-            parse::<i32>(&format!("MOTHUP({}, 1)", i + 1), entries.next())?,
-            parse::<i32>(&format!("MOTHUP({}, 2)", i + 1), entries.next())?,
+            parse(|| format!("MOTHUP({}, 1)", i + 1), entries.next())?,
+            parse(|| format!("MOTHUP({}, 2)", i + 1), entries.next())?,
         ]);
         ICOLUP.push([
-            parse::<i32>(&format!("ICOLUP({}, 1)", i + 1), entries.next())?,
-            parse::<i32>(&format!("ICOLUP({}, 2)", i + 1), entries.next())?,
+            parse(|| format!("ICOLUP({}, 1)", i + 1), entries.next())?,
+            parse(|| format!("ICOLUP({}, 2)", i + 1), entries.next())?,
         ]);
         PUP.push([
-            parse::<f64>(&format!("PUP({}, 1)", i + 1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 2)", i + 1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 3)", i + 1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 4)", i + 1), entries.next())?,
-            parse::<f64>(&format!("PUP({}, 5)", i + 1), entries.next())?,
+            parse(|| format!("PUP({}, 1)", i + 1), entries.next())?,
+            parse(|| format!("PUP({}, 2)", i + 1), entries.next())?,
+            parse(|| format!("PUP({}, 3)", i + 1), entries.next())?,
+            parse(|| format!("PUP({}, 4)", i + 1), entries.next())?,
+            parse(|| format!("PUP({}, 5)", i + 1), entries.next())?,
         ]);
         VTIMUP
-            .push(parse::<f64>(&format!("VTIMUP({})", i + 1), entries.next())?);
+            .push(parse(|| format!("VTIMUP({})", i + 1), entries.next())?);
         SPINUP
-            .push(parse::<f64>(&format!("SPINUP({})", i + 1), entries.next())?);
+            .push(parse(|| format!("SPINUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
     loop {
