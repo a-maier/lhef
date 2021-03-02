@@ -325,6 +325,21 @@ where
     }
 }
 
+fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, Box<dyn error::Error>>
+where
+    F: FnOnce() ->  S,
+    S: Into<String>
+{
+    use self::ParseError::*;
+    let text: &str = text.ok_or_else(
+        || Box::new(MissingEntry(name().into()))
+    )?;
+    match fast_float::parse(text) {
+        Ok(t) => Ok(t),
+        Err(_) => Err(Box::new(ConversionError(text.to_owned()))),
+    }
+}
+
 fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<dyn error::Error>> {
     use self::ParseError::BadXmlTag;
     let tag = xml_tag.trim();
@@ -407,8 +422,8 @@ fn parse_init<T: BufRead>(
         parse(|| "IDBMUP(2)", entries.next())?,
     ];
     let EBMUP = [
-        parse(|| "EBMUP(1)", entries.next())?,
-        parse(|| "EBMUP(2)", entries.next())?,
+        parse_f64(|| "EBMUP(1)", entries.next())?,
+        parse_f64(|| "EBMUP(2)", entries.next())?,
     ];
     let PDFGUP = [
         parse(|| "PDFGUP(1)", entries.next())?,
@@ -429,11 +444,11 @@ fn parse_init<T: BufRead>(
         stream.read_line(&mut line)?;
         let mut entries = line.split_whitespace();
         XSECUP
-            .push(parse(|| format!("XSECUP({})", i + 1), entries.next())?);
+            .push(parse_f64(|| format!("XSECUP({})", i + 1), entries.next())?);
         XERRUP
-            .push(parse(|| format!("XERRUP({})", i + 1), entries.next())?);
+            .push(parse_f64(|| format!("XERRUP({})", i + 1), entries.next())?);
         XMAXUP
-            .push(parse(|| format!("XMAXUP({})", i + 1), entries.next())?);
+            .push(parse_f64(|| format!("XMAXUP({})", i + 1), entries.next())?);
         LPRUP.push(parse(|| format!("LPRUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
@@ -473,10 +488,10 @@ fn parse_event<T: BufRead>(
     let mut entries = line.split_whitespace();
     let NUP = parse(|| "NUP", entries.next())?;
     let IDRUP = parse(|| "IDRUP", entries.next())?;
-    let XWGTUP = parse(|| "XWGTUP", entries.next())?;
-    let SCALUP = parse(|| "SCALUP", entries.next())?;
-    let AQEDUP = parse(|| "AQEDUP", entries.next())?;
-    let AQCDUP = parse(|| "AQCDUP", entries.next())?;
+    let XWGTUP = parse_f64(|| "XWGTUP", entries.next())?;
+    let SCALUP = parse_f64(|| "SCALUP", entries.next())?;
+    let AQEDUP = parse_f64(|| "AQEDUP", entries.next())?;
+    let AQCDUP = parse_f64(|| "AQCDUP", entries.next())?;
     let mut IDUP = Vec::with_capacity(NUP as usize);
     let mut ISTUP = Vec::with_capacity(NUP as usize);
     let mut MOTHUP = Vec::with_capacity(NUP as usize);
@@ -499,16 +514,16 @@ fn parse_event<T: BufRead>(
             parse(|| format!("ICOLUP({}, 2)", i + 1), entries.next())?,
         ]);
         PUP.push([
-            parse(|| format!("PUP({}, 1)", i + 1), entries.next())?,
-            parse(|| format!("PUP({}, 2)", i + 1), entries.next())?,
-            parse(|| format!("PUP({}, 3)", i + 1), entries.next())?,
-            parse(|| format!("PUP({}, 4)", i + 1), entries.next())?,
-            parse(|| format!("PUP({}, 5)", i + 1), entries.next())?,
+            parse_f64(|| format!("PUP({}, 1)", i + 1), entries.next())?,
+            parse_f64(|| format!("PUP({}, 2)", i + 1), entries.next())?,
+            parse_f64(|| format!("PUP({}, 3)", i + 1), entries.next())?,
+            parse_f64(|| format!("PUP({}, 4)", i + 1), entries.next())?,
+            parse_f64(|| format!("PUP({}, 5)", i + 1), entries.next())?,
         ]);
         VTIMUP
-            .push(parse(|| format!("VTIMUP({})", i + 1), entries.next())?);
+            .push(parse_f64(|| format!("VTIMUP({})", i + 1), entries.next())?);
         SPINUP
-            .push(parse(|| format!("SPINUP({})", i + 1), entries.next())?);
+            .push(parse_f64(|| format!("SPINUP({})", i + 1), entries.next())?);
     }
     let mut info = String::new();
     loop {
