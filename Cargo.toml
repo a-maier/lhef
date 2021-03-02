@@ -14,7 +14,8 @@ repository = "https://github.com/a-maier/lhef"
 xmltree = "0.9"
 itertools = "0.10"
 serde = { version = "1.0", optional = true, features = ["derive"] }
-fast-float = "0.2.0"
+fast-float = "0.2"
+ryu = "1.0"
 
 [dev-dependencies]
 flate2 = "1.0"

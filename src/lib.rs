@@ -974,6 +974,7 @@ impl<T: Write> Writer<T> {
         &mut self,
         event: &HEPEUP
     ) -> Result<(), Box<dyn error::Error>> {
+        let mut buffer = ryu::Buffer::new();
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
         if num_particles != event.IDUP.len()
@@ -996,10 +997,10 @@ impl<T: Write> Writer<T> {
             "{} {} {} {} {} {} ",
             event.NUP,
             event.IDRUP,
-            event.XWGTUP,
-            event.SCALUP,
-            event.AQEDUP,
-            event.AQCDUP
+            buffer.format(event.XWGTUP),
+            ryu::Buffer::new().format(event.SCALUP),
+            ryu::Buffer::new().format(event.AQEDUP),
+            ryu::Buffer::new().format(event.AQCDUP)
         )?;
         output += ">\n";
         let particles = izip!(
@@ -1011,6 +1012,7 @@ impl<T: Write> Writer<T> {
             &event.VTIMUP,
             &event.SPINUP,
         );
+
         for (id, status, mothers, colour, p, lifetime, spin) in particles {
             write!(&mut output, "{} {} ", id, status)?;
             for m in mothers {
@@ -1020,9 +1022,10 @@ impl<T: Write> Writer<T> {
                 write!(&mut output, "{} ", c)?;
             }
             for p in p {
-                write!(&mut output, "{} ", p)?;
+                write!(&mut output, "{} ", buffer.format(*p))?;
             }
-            writeln!(&mut output, "{} {}", lifetime, spin)?;
+            writeln!(&mut output, "{} ", buffer.format(*lifetime))?;
+            output.write_str(buffer.format(*spin))?
         }
         if !event.info.is_empty() {
             output += &event.info;
