@@ -992,9 +992,9 @@ impl<T: Write> Writer<T> {
             write!(&mut output, " {}=\"{}\"", attr, value)?;
         }
         output += ">\n";
-        write!(
+        writeln!(
             &mut output,
-            "{} {} {} {} {} {} ",
+            "{} {} {} {} {} {}",
             event.NUP,
             event.IDRUP,
             buffer.format(event.XWGTUP),
@@ -1002,7 +1002,6 @@ impl<T: Write> Writer<T> {
             ryu::Buffer::new().format(event.AQEDUP),
             ryu::Buffer::new().format(event.AQCDUP)
         )?;
-        output += ">\n";
         let particles = izip!(
             &event.IDUP,
             &event.ISTUP,
@@ -1024,8 +1023,8 @@ impl<T: Write> Writer<T> {
             for p in p {
                 write!(&mut output, "{} ", buffer.format(*p))?;
             }
-            writeln!(&mut output, "{} ", buffer.format(*lifetime))?;
-            output.write_str(buffer.format(*spin))?
+            write!(&mut output, "{} ", buffer.format(*lifetime))?;
+            writeln!(&mut output, "{}", buffer.format(*spin))?;
         }
         if !event.info.is_empty() {
             output += &event.info;
