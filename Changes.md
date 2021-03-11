@@ -1,3 +1,7 @@
+# Version 0.3.4
+
+- Fixed regression in `Writer`
+
 # Version 0.3.3
 
 - Improve performance by a lot
