@@ -189,7 +189,7 @@ impl<T: BufRead> Reader<T> {
 
     /// Get the LHEF version
     pub fn version(&self) -> &str {
-        &self.version
+        self.version
     }
 
     /// Get the LHEF header
@@ -387,7 +387,7 @@ fn next_attr(
         Some(idx) => &rem[..idx],
         None => return Err(Box::new(BadXmlTag(attr_str.to_owned()))),
     };
-    rem = &rem[value.len() + 1..].trim_start();
+    rem = rem[value.len() + 1..].trim_start();
     let attr = Attr { name, value };
     Ok((Some(attr), rem))
 }
@@ -610,7 +610,7 @@ fn xml_to_string(xml: &XmlTree, output: &mut String) {
         *output += text;
     }
     for child in &xml.children {
-        xml_to_string(&child, output)
+        xml_to_string(child, output)
     }
     *output += &format!("</{}>", xml.name);
 }
@@ -815,7 +815,7 @@ impl<T: Write> Writer<T> {
         let mut output = String::from(HEADER_START);
         if header.name != "header" {
             output += ">\n";
-            xml_to_string(&header, &mut output);
+            xml_to_string(header, &mut output);
             output += "\n";
         } else {
             for (key, value) in &header.attributes {
@@ -825,7 +825,7 @@ impl<T: Write> Writer<T> {
             if !header.children.is_empty() {
                 output += "\n";
                 for child in &header.children {
-                    xml_to_string(&child, &mut output)
+                    xml_to_string(child, &mut output)
                 }
             }
             match header.text {
