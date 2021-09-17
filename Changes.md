@@ -1,3 +1,9 @@
+# Version 0.4.0
+
+- Added destructuring methods for `Reader` and `Writer`
+- Added `Reader` constructor from raw parts
+- Changed `Reader` and `Writer` methods to return specific error types
+
 # Version 0.3.4
 
 - Fixed regression in `Writer`
