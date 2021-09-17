@@ -51,13 +51,6 @@ pub use crate::data::XmlTree as XmlTree;
 pub use crate::reader::Reader as Reader;
 pub use crate::writer::Writer as Writer;
 
-#[cfg(feature = "serde")]
-#[macro_use]
-extern crate serde;
-extern crate xmltree;
-#[macro_use]
-extern crate itertools;
-
 #[cfg(test)]
 mod tests {
     extern crate flate2;

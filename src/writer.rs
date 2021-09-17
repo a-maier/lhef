@@ -8,6 +8,8 @@ use std::str;
 use crate::syntax::*;
 use crate::data::*;
 
+use itertools::izip;
+
 /// Writer for the LHEF format
 ///
 /// The general usage to write a file is
