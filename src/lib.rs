@@ -39,6 +39,13 @@
 //! # Ok(())
 //! # }
 //! ```
+mod data;
+
+pub use crate::data::HEPEUP as HEPEUP;
+pub use crate::data::HEPRUP as HEPRUP;
+pub use crate::data::XmlAttr as XmlAttr;
+pub use crate::data::XmlTree as XmlTree;
+
 #[cfg(feature = "serde")]
 #[macro_use]
 extern crate serde;
@@ -46,15 +53,12 @@ extern crate xmltree;
 #[macro_use]
 extern crate itertools;
 
-use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::fmt::Write as FmtWrite;
 use std::io::{BufRead, Write};
 use std::ops::Drop;
 use std::str;
-
-pub type XmlTree = xmltree::Element;
 
 const LHEF_TAG_OPEN: &str = "<LesHouchesEvents version=";
 const COMMENT_START: &str = "<!--";
@@ -66,80 +70,6 @@ const INIT_END: &str = "</init>";
 const EVENT_START: &str = "<event";
 const EVENT_END: &str = "</event>";
 const LHEF_LAST_LINE: &str = "</LesHouchesEvents>";
-
-pub type XmlAttr = HashMap<String, String>;
-
-/// Generator run information
-///
-/// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
-#[allow(non_snake_case)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(PartialEq, Debug, Clone)]
-pub struct HEPRUP {
-    /// Beam IDs
-    pub IDBMUP: [i32; 2],
-    /// Beam energies
-    pub EBMUP: [f64; 2],
-    /// PDF groups
-    pub PDFGUP: [i32; 2],
-    /// PDF set IDs
-    pub PDFSUP: [i32; 2],
-    /// Event weight specification
-    pub IDWTUP: i32,
-    /// Number of subprocesses
-    pub NPRUP: i32,
-    /// Subprocess cross sections
-    pub XSECUP: Vec<f64>,
-    /// Subprocess cross section errors
-    pub XERRUP: Vec<f64>,
-    /// Subprocess maximum weights
-    pub XMAXUP: Vec<f64>,
-    /// Process IDs
-    pub LPRUP: Vec<i32>,
-    /// Optional run information
-    pub info: String,
-    /// Attributes in <init> tag
-    pub attr: XmlAttr,
-}
-
-/// Event information
-///
-/// See <https://arxiv.org/abs/hep-ph/0109068v1> for details on the fields.
-#[allow(non_snake_case)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(PartialEq, Debug, Clone)]
-pub struct HEPEUP {
-    /// Number of particles
-    pub NUP: i32,
-    /// Process ID
-    pub IDRUP: i32,
-    /// Event weight
-    pub XWGTUP: f64,
-    /// Scale in GeV
-    pub SCALUP: f64,
-    /// Value of the QED coupling α
-    pub AQEDUP: f64,
-    /// Value of the QCD coupling α_s
-    pub AQCDUP: f64,
-    /// Particle IDs
-    pub IDUP: Vec<i32>,
-    /// Particle status
-    pub ISTUP: Vec<i32>,
-    /// Indices of decay mothers
-    pub MOTHUP: Vec<[i32; 2]>,
-    /// Colour flow
-    pub ICOLUP: Vec<[i32; 2]>,
-    /// Particle momentum in GeV
-    pub PUP: Vec<[f64; 5]>,
-    /// Lifetime in mm
-    pub VTIMUP: Vec<f64>,
-    /// Spin angle
-    pub SPINUP: Vec<f64>,
-    /// Optional event information
-    pub info: String,
-    /// Attributes in <event> tag
-    pub attr: XmlAttr,
-}
 
 /// Reader for the LHEF format
 #[derive(Debug, PartialEq)]
