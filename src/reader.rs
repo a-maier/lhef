@@ -26,7 +26,7 @@ impl<T: BufRead> Reader<T> {
     /// let file = std::io::BufReader::new(file);
     /// let reader = lhef::Reader::new(file).unwrap();
     /// ```
-    pub fn new(mut stream: T) -> Result<Reader<T>, ParseError> {
+    pub fn new(mut stream: T) -> Result<Reader<T>, ReadError> {
         let version = parse_version(&mut stream)?;
         let (header, xml_header, init_start) = parse_header(&mut stream)?;
         let heprup = parse_init(&init_start, &mut stream)?;
@@ -74,7 +74,7 @@ impl<T: BufRead> Reader<T> {
     ///    None => println!("Reached end of event file."),
     /// }
     /// ```
-    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, ParseError> {
+    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, ReadError> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
         if line.starts_with(EVENT_START) {
@@ -82,21 +82,21 @@ impl<T: BufRead> Reader<T> {
         } else if line.trim() == LHEF_LAST_LINE {
             Ok(None)
         } else {
-            Err(ParseError::BadEventStart(line))
+            Err(ReadError::BadEventStart(line))
         }
     }
 }
 
 fn parse_version<T: BufRead>(
     stream: &mut T,
-) -> Result<&'static str, ParseError> {
-    use self::ParseError::*;
+) -> Result<&'static str, ReadError> {
+    use self::ReadError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
     let line_cp = first_line.clone();
     let mut line_entries = first_line.trim().split('"');
     if line_entries.next() != Some(LHEF_TAG_OPEN) {
-        return Err(ParseError::BadFirstLine(line_cp));
+        return Err(ReadError::BadFirstLine(line_cp));
     };
     let version = match line_entries.next() {
         Some("1.0") => "1.0",
@@ -108,15 +108,15 @@ fn parse_version<T: BufRead>(
         None => return Err(MissingVersion),
     };
     if line_entries.next() != Some(">") {
-        return Err(ParseError::BadFirstLine(line_cp));
+        return Err(ReadError::BadFirstLine(line_cp));
     };
     Ok(version)
 }
 
 fn parse_header<T: BufRead>(
     mut stream: &mut T,
-) -> Result<(String, Option<XmlTree>, String), ParseError> {
-    use ParseError::BadHeaderStart;
+) -> Result<(String, Option<XmlTree>, String), ReadError> {
+    use ReadError::BadHeaderStart;
     let mut header = String::new();
     let mut xml_header = None;
     loop {
@@ -134,7 +134,7 @@ fn parse_header<T: BufRead>(
         } else if header_text.trim_start().starts_with(INIT_START) {
             return Ok((header, xml_header, header_text));
         } else {
-            return Err(ParseError::BadHeaderStart(header_text));
+            return Err(ReadError::BadHeaderStart(header_text));
         }
     }
 }
@@ -150,10 +150,10 @@ fn read_lines_until<T: BufRead>(
     stream: &mut T,
     header: &mut String,
     header_end: &str,
-) -> Result<(), ParseError> {
+) -> Result<(), ReadError> {
     loop {
         if stream.read_line(header)? == 0 {
-            return Err(ParseError::EndOfFile("header"));
+            return Err(ReadError::EndOfFile("header"));
         }
         if header.lines().last().unwrap().trim() == header_end {
             return Ok(());
@@ -161,13 +161,13 @@ fn read_lines_until<T: BufRead>(
     }
 }
 
-fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, ParseError>
+fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, ReadError>
 where
     T: str::FromStr,
     F: FnOnce() ->  S,
     S: Into<String>
 {
-    use self::ParseError::*;
+    use self::ReadError::*;
     let text: &str = text.ok_or_else(
         || MissingEntry(name().into())
     )?;
@@ -177,12 +177,12 @@ where
     }
 }
 
-fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, ParseError>
+fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, ReadError>
 where
     F: FnOnce() ->  S,
     S: Into<String>
 {
-    use self::ParseError::*;
+    use self::ReadError::*;
     let text: &str = text.ok_or_else(
         || MissingEntry(name().into())
     )?;
@@ -192,8 +192,8 @@ where
     }
 }
 
-fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, ParseError> {
-    use self::ParseError::BadXmlTag;
+fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, ReadError> {
+    use self::ReadError::BadXmlTag;
     let tag = xml_tag.trim();
     if !tag.ends_with('>') {
         return Err(BadXmlTag(xml_tag.to_owned()));
@@ -215,8 +215,8 @@ struct Attr<'a> {
 
 fn next_attr(
     attr_str: &str,
-) -> Result<(Option<Attr>, &str), ParseError> {
-    use self::ParseError::BadXmlTag;
+) -> Result<(Option<Attr>, &str), ReadError> {
+    use self::ReadError::BadXmlTag;
     let mut rem = attr_str;
     let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
     let name = match name_end {
@@ -244,7 +244,7 @@ fn next_attr(
     Ok((Some(attr), rem))
 }
 
-fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, ParseError> {
+fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, ReadError> {
     let mut attr_str = extract_xml_attr_str(xml_tag)?;
     let mut attr = XmlAttr::new();
     loop {
@@ -265,7 +265,7 @@ fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, ParseError> {
 fn parse_init<T: BufRead>(
     init_open: &str,
     stream: &mut T,
-) -> Result<HEPRUP, ParseError> {
+) -> Result<HEPRUP, ReadError> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -306,7 +306,7 @@ fn parse_init<T: BufRead>(
     let mut info = String::new();
     loop {
         if stream.read_line(&mut info)? == 0 {
-            return Err(ParseError::EndOfFile("init"));
+            return Err(ReadError::EndOfFile("init"));
         }
         if info.lines().last().unwrap() == INIT_END {
             pop_line(&mut info);
@@ -334,7 +334,7 @@ fn parse_init<T: BufRead>(
 fn parse_event<T: BufRead>(
     event_open: &str,
     stream: &mut T,
-) -> Result<HEPEUP, ParseError> {
+) -> Result<HEPEUP, ReadError> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -380,7 +380,7 @@ fn parse_event<T: BufRead>(
     let mut info = String::new();
     loop {
         if stream.read_line(&mut info)? == 0 {
-            return Err(ParseError::EndOfFile("event"));
+            return Err(ReadError::EndOfFile("event"));
         }
         if info.lines().last().unwrap().trim() == EVENT_END {
             pop_line(&mut info);
@@ -408,7 +408,7 @@ fn parse_event<T: BufRead>(
 }
 
 #[derive(Error, Debug)]
-pub enum ParseError {
+pub enum ReadError {
     #[error("First line '{0}' in input does start with '{}'", LHEF_TAG_OPEN)]
     BadFirstLine(String),
     #[error(
