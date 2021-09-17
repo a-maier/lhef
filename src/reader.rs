@@ -16,6 +16,15 @@ pub struct Reader<T> {
     heprup: HEPRUP,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ReaderData<T> {
+    pub stream: T,
+    pub version: &'static str,
+    pub header: String,
+    pub xml_header: Option<XmlTree>,
+    pub heprup: HEPRUP,
+}
+
 impl<T: BufRead> Reader<T> {
     /// Create a new LHEF reader
     ///
@@ -85,6 +94,29 @@ impl<T: BufRead> Reader<T> {
             Err(ReadError::BadEventStart(line))
         }
     }
+
+    /// Extract all components
+    pub fn into_parts(self) -> ReaderData<T> {
+        ReaderData {
+            stream: self.stream,
+            version: self.version,
+            header: self.header,
+            xml_header: self.xml_header,
+            heprup: self.heprup,
+        }
+    }
+
+    /// Build from raw components
+    pub fn from_parts(data: ReaderData<T>) -> Self {
+        Self {
+            stream: data.stream,
+            version: data.version,
+            header: data.header,
+            xml_header: data.xml_header,
+            heprup: data.heprup,
+        }
+    }
+
 }
 
 fn parse_version<T: BufRead>(

@@ -1,5 +1,6 @@
 use std::fmt::Write as FmtWrite;
 use std::io::Write;
+use std::mem::take;
 use std::ops::Drop;
 use std::str;
 
@@ -455,6 +456,17 @@ impl<T: Write> Drop for Writer<T> {
         if self.state == WriterState::ExpectingEventOrFinish {
             let _ = self.finish();
         }
+    }
+}
+
+impl<T: Write + Default> Writer<T> {
+    /// Retrieve the underlying writer
+    pub fn into_inner(mut self) -> T {
+        // ensure that the destructor doesn't do anything
+        if self.state != WriterState::Failed {
+            self.state = WriterState::Finished
+        }
+        take(&mut self.stream)
     }
 }
 
