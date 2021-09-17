@@ -1,0 +1,10 @@
+pub(crate) const LHEF_TAG_OPEN: &str = "<LesHouchesEvents version=";
+pub(crate) const COMMENT_START: &str = "<!--";
+pub(crate) const COMMENT_END: &str = "-->";
+pub(crate) const HEADER_START: &str = "<header";
+pub(crate) const HEADER_END: &str = "</header>";
+pub(crate) const INIT_START: &str = "<init";
+pub(crate) const INIT_END: &str = "</init>";
+pub(crate) const EVENT_START: &str = "<event";
+pub(crate) const EVENT_END: &str = "</event>";
+pub(crate) const LHEF_LAST_LINE: &str = "</LesHouchesEvents>";
