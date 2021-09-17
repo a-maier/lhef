@@ -1,5 +1,3 @@
-use std::error;
-use std::fmt;
 use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::ops::Drop;
@@ -9,6 +7,7 @@ use crate::syntax::*;
 use crate::data::*;
 
 use itertools::izip;
+use thiserror::Error;
 
 /// Writer for the LHEF format
 ///
@@ -39,56 +38,43 @@ pub struct Writer<T: Write> {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Copy)]
-// State of LHEF writer
-enum WriterState {
-    // The next object to be written should be a header or an init block
+/// State of LHEF writer
+pub enum WriterState {
+    /// The next object to be written should be a header or an init block
     ExpectingHeaderOrInit,
-    // The writer can either write an event or finish the LHEF file
+    /// The writer can either write an event or finish the LHEF file
     ExpectingEventOrFinish,
-    // The LHEF file is complete and no further writing is allowed
+    /// The LHEF file is complete and no further writing is allowed
     Finished,
-    // A previous write failed and the LHEF file is in an undetermined
-    // (possible broken) state
+    /// A previous write failed and the LHEF file is in an undetermined
+    /// (possible broken) state
     Failed,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-enum WriteError {
+#[derive(Error, Debug)]
+pub enum WriteError {
+    #[error(
+        "Mismatch between NPRUP and length of at least one of \
+         XSECUP, XERRUP, XMAXUP, LPRUP."
+    )]
     MismatchedSubprocesses,
+    #[error(
+        "Mismatch between NUP and length of at least one of \
+         IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP."
+    )]
     MismatchedParticles,
+    #[error("Writer is in state '{0:?}', cannot write '{1}'.")]
     BadState(WriterState, &'static str),
+    #[error(
+        "Writer is in 'Failed' state. \
+         Output was written, but the file may be broken anyway."
+    )]
     WriteToFailed,
+    #[error("Format error: {0}")]
+    FmtErr(#[from] std::fmt::Error),
+    #[error("Write error: {0}")]
+    WriteErr(#[from] std::io::Error),
 }
-
-impl fmt::Display for WriteError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::WriteError::*;
-        match *self {
-            MismatchedSubprocesses => write!(
-                f,
-                "Mismatch between NPRUP and length of at least one of \
-                 XSECUP, XERRUP, XMAXUP, LPRUP."
-            ),
-            MismatchedParticles => write!(
-                f,
-                "Mismatch between NUP and length of at least one of \
-                 IDUP, ISTUP, MOTHUP, ICOLUP, PUP, VTIMUP, SPINUP."
-            ),
-            BadState(ref state, attempt) => write!(
-                f,
-                "Writer is in state '{:?}', cannot write '{}'.",
-                state, attempt
-            ),
-            WriteToFailed => write!(
-                f,
-                "Writer is in 'Failed' state. \
-                 Output was written, but the file may be broken anyway."
-            ),
-        }
-    }
-}
-
-impl error::Error for WriteError {}
 
 impl<T: Write> Writer<T> {
     /// Create a new LHEF writer
@@ -113,7 +99,7 @@ impl<T: Write> Writer<T> {
     pub fn new(
         mut stream: T,
         version: &str,
-    ) -> Result<Writer<T>, Box<dyn error::Error>> {
+    ) -> Result<Writer<T>, WriteError> {
         let output = String::from(LHEF_TAG_OPEN) + "\"" + version + "\">\n";
         stream.write_all(output.as_bytes())?;
         Ok(Writer {
@@ -126,17 +112,17 @@ impl<T: Write> Writer<T> {
         &self,
         expected: WriterState,
         from: &'static str,
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<(), WriteError> {
         if self.state != expected && self.state != WriterState::Failed {
-            Err(Box::new(WriteError::BadState(self.state, from)))
+            Err(WriteError::BadState(self.state, from))
         } else {
             Ok(())
         }
     }
 
-    fn ok_unless_failed(&self) -> Result<(), Box<dyn error::Error>> {
+    fn ok_unless_failed(&self) -> Result<(), WriteError> {
         if self.state == WriterState::Failed {
-            Err(Box::new(WriteError::WriteToFailed))
+            Err(WriteError::WriteToFailed)
         } else {
             Ok(())
         }
@@ -155,7 +141,7 @@ impl<T: Write> Writer<T> {
     pub fn header(
         &mut self,
         header: &str
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
         let output = String::from(COMMENT_START)
             + "\n"
@@ -167,7 +153,7 @@ impl<T: Write> Writer<T> {
             Ok(_) => self.ok_unless_failed(),
             Err(error) => {
                 self.state = WriterState::Failed;
-                Err(Box::new(error))
+                Err(error.into())
             }
         }
     }
@@ -205,7 +191,7 @@ impl<T: Write> Writer<T> {
     pub fn xml_header(
         &mut self,
         header: &XmlTree,
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
         let mut output = String::from(HEADER_START);
         if header.name != "header" {
@@ -242,7 +228,7 @@ impl<T: Write> Writer<T> {
             Ok(_) => self.ok_unless_failed(),
             Err(error) => {
                 self.state = WriterState::Failed;
-                Err(Box::new(error))
+                Err(error.into())
             }
         }
     }
@@ -275,7 +261,7 @@ impl<T: Write> Writer<T> {
     pub fn heprup(
         &mut self,
         runinfo: &HEPRUP,
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "init")?;
         let num_sub = runinfo.NPRUP as usize;
         if num_sub != runinfo.XSECUP.len()
@@ -283,7 +269,7 @@ impl<T: Write> Writer<T> {
             || num_sub != runinfo.XMAXUP.len()
             || num_sub != runinfo.LPRUP.len()
         {
-            return Err(Box::new(WriteError::MismatchedSubprocesses));
+            return Err(WriteError::MismatchedSubprocesses);
         }
         let mut output = String::from(INIT_START);
         for (attr, value) in &runinfo.attr {
@@ -323,7 +309,7 @@ impl<T: Write> Writer<T> {
         output += "\n";
         if let Err(error) = self.stream.write_all(output.as_bytes()) {
             self.state = WriterState::Failed;
-            return Err(Box::new(error));
+            return Err(error.into());
         }
         if self.state != WriterState::Failed {
             self.state = WriterState::ExpectingEventOrFinish
@@ -368,7 +354,7 @@ impl<T: Write> Writer<T> {
     pub fn hepeup(
         &mut self,
         event: &HEPEUP
-    ) -> Result<(), Box<dyn error::Error>> {
+    ) -> Result<(), WriteError> {
         let mut buffer = ryu::Buffer::new();
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
@@ -380,7 +366,7 @@ impl<T: Write> Writer<T> {
             || num_particles != event.VTIMUP.len()
             || num_particles != event.SPINUP.len()
         {
-            return Err(Box::new(WriteError::MismatchedParticles));
+            return Err(WriteError::MismatchedParticles);
         }
         let mut output = String::from(EVENT_START);
         for (attr, value) in &event.attr {
@@ -433,7 +419,7 @@ impl<T: Write> Writer<T> {
             Ok(_) => self.ok_unless_failed(),
             Err(error) => {
                 self.state = WriterState::Failed;
-                Err(Box::new(error))
+                Err(error.into())
             }
         }
     }
@@ -450,12 +436,12 @@ impl<T: Write> Writer<T> {
     /// // ... write header, run information, events ...
     /// writer.finish().unwrap();
     /// ```
-    pub fn finish(&mut self) -> Result<(), Box<dyn error::Error>> {
+    pub fn finish(&mut self) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingEventOrFinish, "finish")?;
         let output = String::from(LHEF_LAST_LINE) + "\n";
         if let Err(error) = self.stream.write_all(output.as_bytes()) {
             self.state = WriterState::Failed;
-            return Err(Box::new(error));
+            return Err(error.into());
         }
         if self.state != WriterState::Failed {
             self.state = WriterState::Finished
