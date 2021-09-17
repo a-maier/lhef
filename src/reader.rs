@@ -2,9 +2,9 @@ use crate::data::*;
 use crate::syntax::*;
 
 use std::io::BufRead;
-use std::error;
-use std::fmt;
 use std::str;
+
+use thiserror::Error;
 
 /// Reader for the LHEF format
 #[derive(Debug, PartialEq)]
@@ -14,19 +14,6 @@ pub struct Reader<T> {
     header: String,
     xml_header: Option<XmlTree>,
     heprup: HEPRUP,
-}
-
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
-enum ParseError {
-    BadFirstLine(String),
-    BadHeaderStart(String),
-    BadXmlTag(String),
-    BadEventStart(String),
-    MissingEntry(String),
-    ConversionError(String),
-    UnsupportedVersion(String),
-    MissingVersion,
-    EndOfFile(&'static str),
 }
 
 impl<T: BufRead> Reader<T> {
@@ -39,7 +26,7 @@ impl<T: BufRead> Reader<T> {
     /// let file = std::io::BufReader::new(file);
     /// let reader = lhef::Reader::new(file).unwrap();
     /// ```
-    pub fn new(mut stream: T) -> Result<Reader<T>, Box<dyn error::Error>> {
+    pub fn new(mut stream: T) -> Result<Reader<T>, ParseError> {
         let version = parse_version(&mut stream)?;
         let (header, xml_header, init_start) = parse_header(&mut stream)?;
         let heprup = parse_init(&init_start, &mut stream)?;
@@ -87,7 +74,7 @@ impl<T: BufRead> Reader<T> {
     ///    None => println!("Reached end of event file."),
     /// }
     /// ```
-    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, Box<dyn error::Error>> {
+    pub fn hepeup(&mut self) -> Result<Option<HEPEUP>, ParseError> {
         let mut line = String::new();
         self.stream.read_line(&mut line)?;
         if line.starts_with(EVENT_START) {
@@ -95,41 +82,41 @@ impl<T: BufRead> Reader<T> {
         } else if line.trim() == LHEF_LAST_LINE {
             Ok(None)
         } else {
-            Err(Box::new(ParseError::BadEventStart(line)))
+            Err(ParseError::BadEventStart(line))
         }
     }
 }
 
 fn parse_version<T: BufRead>(
     stream: &mut T,
-) -> Result<&'static str, Box<dyn error::Error>> {
+) -> Result<&'static str, ParseError> {
     use self::ParseError::*;
     let mut first_line = String::new();
     stream.read_line(&mut first_line)?;
     let line_cp = first_line.clone();
     let mut line_entries = first_line.trim().split('"');
     if line_entries.next() != Some(LHEF_TAG_OPEN) {
-        return Err(Box::new(ParseError::BadFirstLine(line_cp)));
+        return Err(ParseError::BadFirstLine(line_cp));
     };
     let version = match line_entries.next() {
         Some("1.0") => "1.0",
         Some("2.0") => "2.0",
         Some("3.0") => "3.0",
         Some(version) => {
-            return Err(Box::new(UnsupportedVersion(version.to_string())))
+            return Err(UnsupportedVersion(version.to_string()))
         }
-        None => return Err(Box::new(MissingVersion)),
+        None => return Err(MissingVersion),
     };
     if line_entries.next() != Some(">") {
-        return Err(Box::new(ParseError::BadFirstLine(line_cp)));
+        return Err(ParseError::BadFirstLine(line_cp));
     };
     Ok(version)
 }
 
 fn parse_header<T: BufRead>(
     mut stream: &mut T,
-) -> Result<(String, Option<XmlTree>, String), Box<dyn error::Error>> {
-    use self::ParseError::BadHeaderStart;
+) -> Result<(String, Option<XmlTree>, String), ParseError> {
+    use ParseError::BadHeaderStart;
     let mut header = String::new();
     let mut xml_header = None;
     loop {
@@ -137,7 +124,7 @@ fn parse_header<T: BufRead>(
         stream.read_line(&mut header_text)?;
         if header_text.trim_start().starts_with(COMMENT_START) {
             if header_text.trim() != COMMENT_START {
-                return Err(Box::new(BadHeaderStart(header_text)));
+                return Err(BadHeaderStart(header_text));
             }
             read_lines_until(&mut stream, &mut header_text, COMMENT_END)?;
             header = header_text;
@@ -147,7 +134,7 @@ fn parse_header<T: BufRead>(
         } else if header_text.trim_start().starts_with(INIT_START) {
             return Ok((header, xml_header, header_text));
         } else {
-            return Err(Box::new(ParseError::BadHeaderStart(header_text)));
+            return Err(ParseError::BadHeaderStart(header_text));
         }
     }
 }
@@ -163,10 +150,10 @@ fn read_lines_until<T: BufRead>(
     stream: &mut T,
     header: &mut String,
     header_end: &str,
-) -> Result<(), Box<dyn error::Error>> {
+) -> Result<(), ParseError> {
     loop {
         if stream.read_line(header)? == 0 {
-            return Err(Box::new(ParseError::EndOfFile("header")));
+            return Err(ParseError::EndOfFile("header"));
         }
         if header.lines().last().unwrap().trim() == header_end {
             return Ok(());
@@ -174,7 +161,7 @@ fn read_lines_until<T: BufRead>(
     }
 }
 
-fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, Box<dyn error::Error>>
+fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, ParseError>
 where
     T: str::FromStr,
     F: FnOnce() ->  S,
@@ -182,34 +169,34 @@ where
 {
     use self::ParseError::*;
     let text: &str = text.ok_or_else(
-        || Box::new(MissingEntry(name().into()))
+        || MissingEntry(name().into())
     )?;
     match text.parse::<T>() {
         Ok(t) => Ok(t),
-        Err(_) => Err(Box::new(ConversionError(text.to_owned()))),
+        Err(_) => Err(ConversionError(text.to_owned())),
     }
 }
 
-fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, Box<dyn error::Error>>
+fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, ParseError>
 where
     F: FnOnce() ->  S,
     S: Into<String>
 {
     use self::ParseError::*;
     let text: &str = text.ok_or_else(
-        || Box::new(MissingEntry(name().into()))
+        || MissingEntry(name().into())
     )?;
     match fast_float::parse(text) {
         Ok(t) => Ok(t),
-        Err(_) => Err(Box::new(ConversionError(text.to_owned()))),
+        Err(_) => Err(ConversionError(text.to_owned())),
     }
 }
 
-fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, Box<dyn error::Error>> {
+fn extract_xml_attr_str(xml_tag: &str) -> Result<&str, ParseError> {
     use self::ParseError::BadXmlTag;
     let tag = xml_tag.trim();
     if !tag.ends_with('>') {
-        return Err(Box::new(BadXmlTag(xml_tag.to_owned())));
+        return Err(BadXmlTag(xml_tag.to_owned()));
     }
     let len = tag.len();
     let tag = &tag[..len - 1];
@@ -228,7 +215,7 @@ struct Attr<'a> {
 
 fn next_attr(
     attr_str: &str,
-) -> Result<(Option<Attr>, &str), Box<dyn error::Error>> {
+) -> Result<(Option<Attr>, &str), ParseError> {
     use self::ParseError::BadXmlTag;
     let mut rem = attr_str;
     let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
@@ -238,26 +225,26 @@ fn next_attr(
     };
     rem = rem[name.len()..].trim_start();
     if !rem.starts_with('=') {
-        return Err(Box::new(BadXmlTag(attr_str.to_owned())));
+        return Err(BadXmlTag(attr_str.to_owned()));
     }
     rem = rem[1..].trim_start();
     let quote = rem.chars().next();
     if quote != Some('\'') && quote != Some('"') {
-        return Err(Box::new(BadXmlTag(attr_str.to_owned())));
+        return Err(BadXmlTag(attr_str.to_owned()));
     }
     let quote = quote.unwrap();
     rem = &rem[1..];
     let value_end = rem.find(quote);
     let value = match value_end {
         Some(idx) => &rem[..idx],
-        None => return Err(Box::new(BadXmlTag(attr_str.to_owned()))),
+        None => return Err(BadXmlTag(attr_str.to_owned())),
     };
     rem = rem[value.len() + 1..].trim_start();
     let attr = Attr { name, value };
     Ok((Some(attr), rem))
 }
 
-fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<dyn error::Error>> {
+fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, ParseError> {
     let mut attr_str = extract_xml_attr_str(xml_tag)?;
     let mut attr = XmlAttr::new();
     loop {
@@ -278,7 +265,7 @@ fn extract_xml_attr(xml_tag: &str) -> Result<XmlAttr, Box<dyn error::Error>> {
 fn parse_init<T: BufRead>(
     init_open: &str,
     stream: &mut T,
-) -> Result<HEPRUP, Box<dyn error::Error>> {
+) -> Result<HEPRUP, ParseError> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -319,7 +306,7 @@ fn parse_init<T: BufRead>(
     let mut info = String::new();
     loop {
         if stream.read_line(&mut info)? == 0 {
-            return Err(Box::new(ParseError::EndOfFile("init")));
+            return Err(ParseError::EndOfFile("init"));
         }
         if info.lines().last().unwrap() == INIT_END {
             pop_line(&mut info);
@@ -347,7 +334,7 @@ fn parse_init<T: BufRead>(
 fn parse_event<T: BufRead>(
     event_open: &str,
     stream: &mut T,
-) -> Result<HEPEUP, Box<dyn error::Error>> {
+) -> Result<HEPEUP, ParseError> {
     let mut line = String::new();
     stream.read_line(&mut line)?;
     let mut entries = line.split_whitespace();
@@ -393,7 +380,7 @@ fn parse_event<T: BufRead>(
     let mut info = String::new();
     loop {
         if stream.read_line(&mut info)? == 0 {
-            return Err(Box::new(ParseError::EndOfFile("event")));
+            return Err(ParseError::EndOfFile("event"));
         }
         if info.lines().last().unwrap().trim() == EVENT_END {
             pop_line(&mut info);
@@ -420,49 +407,40 @@ fn parse_event<T: BufRead>(
     })
 }
 
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::ParseError::*;
-        match *self {
-            BadFirstLine(ref line) => write!(
-                f,
-                "First line '{}' in input does start with '{}'",
-                line, LHEF_TAG_OPEN
-            ),
-            BadHeaderStart(ref line) => write!(
-                f,
-                "Encountered unrecognized line '{}', \
-                 expected a header starting with '{}', '{}', \
-                 or the init block starting with '{}'",
-                line, COMMENT_START, HEADER_START, INIT_START
-            ),
-            BadXmlTag(ref line) => {
-                write!(f, "Encountered malformed xml tag: '{}'", line)
-            }
-            BadEventStart(ref line) => write!(
-                f,
-                "Encountered unrecognized line '{}', \
-                 expected an event starting with '{}'",
-                line, EVENT_START
-            ),
-            UnsupportedVersion(ref version) => write!(
-                f,
-                "Unsupported version {}, only 1.0, 2.0, 3.0 are supported",
-                version
-            ),
-            MissingVersion => write!(f, "Version information missing"),
-            MissingEntry(ref entry) => write!(f, "Missing entry '{}'", entry),
-            ConversionError(ref entry) => {
-                write!(f, "Failed to convert to number: '{}'", entry)
-            }
-            EndOfFile(ref block) => {
-                write!(f, "Encountered '{}' block without closing tag", block)
-            }
-        }
-    }
+#[derive(Error, Debug)]
+pub enum ParseError {
+    #[error("First line '{0}' in input does start with '{}'", LHEF_TAG_OPEN)]
+    BadFirstLine(String),
+    #[error(
+        "Encountered unrecognized line '{0}', \
+         expected a header starting with '{}', '{}', \
+         or the init block starting with '{}'",
+        COMMENT_START, HEADER_START, INIT_START
+    )]
+    BadHeaderStart(String),
+    #[error("Encountered malformed xml tag: '{0}'")]
+    BadXmlTag(String),
+    #[error(
+        "Encountered unrecognized line '{0}', \
+         expected an event starting with '{}'",
+        EVENT_START
+    )]
+    BadEventStart(String),
+    #[error("Missing entry '{0}'")]
+    MissingEntry(String),
+    #[error("Failed to convert to number: '{0}'")]
+    ConversionError(String),
+    #[error("Unsupported version '{0}': only '1.0', '2.0', '3.0' are supported")]
+    UnsupportedVersion(String),
+    #[error("Version information missing")]
+    MissingVersion,
+    #[error("Encountered '{0}' block without closing tag")]
+    EndOfFile(&'static str),
+    #[error("Read error: {0}")]
+    ReadErr(#[from] std::io::Error),
+    #[error("xml parse error: {0}")]
+    XmlErr(#[from] xmltree::ParseError),
 }
-
-impl error::Error for ParseError {}
 
 #[cfg(test)]
 mod reader_tests {
