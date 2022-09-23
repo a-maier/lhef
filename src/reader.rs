@@ -116,7 +116,6 @@ impl<T: BufRead> Reader<T> {
             heprup: data.heprup,
         }
     }
-
 }
 
 fn parse_version<T: BufRead>(
@@ -134,9 +133,7 @@ fn parse_version<T: BufRead>(
         Some("1.0") => "1.0",
         Some("2.0") => "2.0",
         Some("3.0") => "3.0",
-        Some(version) => {
-            return Err(UnsupportedVersion(version.to_string()))
-        }
+        Some(version) => return Err(UnsupportedVersion(version.to_string())),
         None => return Err(MissingVersion),
     };
     if line_entries.next() != Some(">") {
@@ -196,13 +193,11 @@ fn read_lines_until<T: BufRead>(
 fn parse<F, T, S>(name: F, text: Option<&str>) -> Result<T, ReadError>
 where
     T: str::FromStr,
-    F: FnOnce() ->  S,
-    S: Into<String>
+    F: FnOnce() -> S,
+    S: Into<String>,
 {
     use self::ReadError::*;
-    let text: &str = text.ok_or_else(
-        || MissingEntry(name().into())
-    )?;
+    let text: &str = text.ok_or_else(|| MissingEntry(name().into()))?;
     match text.parse::<T>() {
         Ok(t) => Ok(t),
         Err(_) => Err(ConversionError(text.to_owned())),
@@ -211,13 +206,11 @@ where
 
 fn parse_f64<F, S>(name: F, text: Option<&str>) -> Result<f64, ReadError>
 where
-    F: FnOnce() ->  S,
-    S: Into<String>
+    F: FnOnce() -> S,
+    S: Into<String>,
 {
     use self::ReadError::*;
-    let text: &str = text.ok_or_else(
-        || MissingEntry(name().into())
-    )?;
+    let text: &str = text.ok_or_else(|| MissingEntry(name().into()))?;
     match fast_float::parse(text) {
         Ok(t) => Ok(t),
         Err(_) => Err(ConversionError(text.to_owned())),
@@ -245,9 +238,7 @@ struct Attr<'a> {
     value: &'a str,
 }
 
-fn next_attr(
-    attr_str: &str,
-) -> Result<(Option<Attr>, &str), ReadError> {
+fn next_attr(attr_str: &str) -> Result<(Option<Attr>, &str), ReadError> {
     use self::ReadError::BadXmlTag;
     let mut rem = attr_str;
     let name_end = rem.find(|c: char| c.is_whitespace() || c == '=');
@@ -447,7 +438,9 @@ pub enum ReadError {
         "Encountered unrecognized line '{0}', \
          expected a header starting with '{}', '{}', \
          or the init block starting with '{}'",
-        COMMENT_START, HEADER_START, INIT_START
+        COMMENT_START,
+        HEADER_START,
+        INIT_START
     )]
     BadHeaderStart(String),
     #[error("Encountered malformed xml tag: '{0}'")]
@@ -462,7 +455,9 @@ pub enum ReadError {
     MissingEntry(String),
     #[error("Failed to convert to number: '{0}'")]
     ConversionError(String),
-    #[error("Unsupported version '{0}': only '1.0', '2.0', '3.0' are supported")]
+    #[error(
+        "Unsupported version '{0}': only '1.0', '2.0', '3.0' are supported"
+    )]
     UnsupportedVersion(String),
     #[error("Version information missing")]
     MissingVersion,

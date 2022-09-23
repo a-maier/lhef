@@ -44,12 +44,12 @@ mod reader;
 mod syntax;
 mod writer;
 
-pub use crate::data::HEPEUP as HEPEUP;
-pub use crate::data::HEPRUP as HEPRUP;
-pub use crate::data::XmlAttr as XmlAttr;
-pub use crate::data::XmlTree as XmlTree;
-pub use crate::reader::Reader as Reader;
-pub use crate::writer::Writer as Writer;
+pub use crate::data::XmlAttr;
+pub use crate::data::XmlTree;
+pub use crate::data::HEPEUP;
+pub use crate::data::HEPRUP;
+pub use crate::reader::Reader;
+pub use crate::writer::Writer;
 
 #[cfg(test)]
 mod tests {

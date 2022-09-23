@@ -4,8 +4,8 @@ use std::mem::take;
 use std::ops::Drop;
 use std::str;
 
-use crate::syntax::*;
 use crate::data::*;
+use crate::syntax::*;
 
 use itertools::izip;
 use thiserror::Error;
@@ -97,10 +97,7 @@ impl<T: Write> Writer<T> {
     ///    std::io::Cursor::new(&mut output), "1.0"
     /// ).unwrap();
     /// ```
-    pub fn new(
-        mut stream: T,
-        version: &str,
-    ) -> Result<Writer<T>, WriteError> {
+    pub fn new(mut stream: T, version: &str) -> Result<Writer<T>, WriteError> {
         let output = String::from(LHEF_TAG_OPEN) + "\"" + version + "\">\n";
         stream.write_all(output.as_bytes())?;
         Ok(Writer {
@@ -139,10 +136,7 @@ impl<T: Write> Writer<T> {
     /// ).unwrap();
     /// writer.header("some header text").unwrap();
     /// ```
-    pub fn header(
-        &mut self,
-        header: &str
-    ) -> Result<(), WriteError> {
+    pub fn header(&mut self, header: &str) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "header")?;
         let output = String::from(COMMENT_START)
             + "\n"
@@ -189,10 +183,7 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.xml_header(&header).unwrap();
     /// ```
-    pub fn xml_header(
-        &mut self,
-        header: &XmlTree,
-    ) -> Result<(), WriteError> {
+    pub fn xml_header(&mut self, header: &XmlTree) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "xml header")?;
         let mut output = String::from(HEADER_START);
         if header.name != "header" {
@@ -259,10 +250,7 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.heprup(&heprup).unwrap();
     /// ```
-    pub fn heprup(
-        &mut self,
-        runinfo: &HEPRUP,
-    ) -> Result<(), WriteError> {
+    pub fn heprup(&mut self, runinfo: &HEPRUP) -> Result<(), WriteError> {
         self.assert_state(WriterState::ExpectingHeaderOrInit, "init")?;
         let num_sub = runinfo.NPRUP as usize;
         if num_sub != runinfo.XSECUP.len()
@@ -352,10 +340,7 @@ impl<T: Write> Writer<T> {
     /// };
     /// writer.hepeup(&hepeup).unwrap();
     /// ```
-    pub fn hepeup(
-        &mut self,
-        event: &HEPEUP
-    ) -> Result<(), WriteError> {
+    pub fn hepeup(&mut self, event: &HEPEUP) -> Result<(), WriteError> {
         let mut buffer = ryu::Buffer::new();
         self.assert_state(WriterState::ExpectingEventOrFinish, "event")?;
         let num_particles = event.NUP as usize;
