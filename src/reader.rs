@@ -16,12 +16,18 @@ pub struct Reader<T> {
     heprup: HEPRUP,
 }
 
+/// Data components forming a reader
 #[derive(Debug, PartialEq)]
 pub struct ReaderData<T> {
+    /// Stream from which we read
     pub stream: T,
+    /// LHEF version
     pub version: &'static str,
+    /// LHEF header
     pub header: String,
+    /// LHEF XML header
     pub xml_header: Option<XmlTree>,
+    /// Generator run information
     pub heprup: HEPRUP,
 }
 

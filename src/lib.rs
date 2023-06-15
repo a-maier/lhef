@@ -40,9 +40,9 @@
 //! # }
 //! ```
 mod data;
-mod reader;
+pub mod reader;
 mod syntax;
-mod writer;
+pub mod writer;
 
 pub use crate::data::XmlAttr;
 pub use crate::data::XmlTree;
