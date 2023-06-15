@@ -96,24 +96,38 @@ impl<T: BufRead> Reader<T> {
     }
 
     /// Extract all components
+    #[deprecated(note = "Use `ReaderData::from(self)` instead")]
     pub fn into_parts(self) -> ReaderData<T> {
-        ReaderData {
-            stream: self.stream,
-            version: self.version,
-            header: self.header,
-            xml_header: self.xml_header,
-            heprup: self.heprup,
-        }
+        self.into()
     }
 
     /// Build from raw components
+    #[deprecated(note = "Use `Reader::from(data)` instead")]
     pub fn from_parts(data: ReaderData<T>) -> Self {
+        Self::from(data)
+    }
+}
+
+impl<T> From<Reader<T>> for ReaderData<T> {
+    fn from(source: Reader<T>) -> Self {
         Self {
-            stream: data.stream,
-            version: data.version,
-            header: data.header,
-            xml_header: data.xml_header,
-            heprup: data.heprup,
+            stream: source.stream,
+            version: source.version,
+            header: source.header,
+            xml_header: source.xml_header,
+            heprup: source.heprup,
+        }
+    }
+}
+
+impl<T> From<ReaderData<T>> for Reader<T> {
+    fn from(source: ReaderData<T>) -> Self {
+        Self {
+            stream: source.stream,
+            version: source.version,
+            header: source.header,
+            xml_header: source.xml_header,
+            heprup: source.heprup,
         }
     }
 }
