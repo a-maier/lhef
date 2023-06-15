@@ -40,8 +40,12 @@
 //! # }
 //! ```
 mod data;
+/// LHEF reader
 pub mod reader;
+/// Particle status codes
+pub mod status;
 mod syntax;
+/// LHEF writer
 pub mod writer;
 
 pub use crate::data::XmlAttr;
