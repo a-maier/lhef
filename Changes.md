@@ -5,6 +5,7 @@
   `Reader` and `ReaderData`
 - Added constants for status codes
 - Fix serialisation
+- Update to Rust 2021
 
 # Version 0.4.0
 
