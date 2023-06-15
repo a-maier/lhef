@@ -4,6 +4,7 @@
 - Use `From` trait instead of custom functions for conversions between
   `Reader` and `ReaderData`
 - Added constants for status codes
+- Fix serialisation
 
 # Version 0.4.0
 

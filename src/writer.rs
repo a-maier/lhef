@@ -10,6 +10,9 @@ use crate::syntax::*;
 use itertools::izip;
 use thiserror::Error;
 
+#[cfg(feature = "serde")]
+use serde::{Serialize, Deserialize};
+
 /// Writer for the LHEF format
 ///
 /// The general usage to write a file is
