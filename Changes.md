@@ -1,3 +1,10 @@
+# Version 0.5.0
+
+- Made `ReaderData`, `ReadError`, and `WriteError` public
+- Use `From` trait instead of custom functions for conversions between
+  `Reader` and `ReaderData`
+- Added constants for status codes
+
 # Version 0.4.0
 
 - Added destructuring methods for `Reader` and `Writer`
