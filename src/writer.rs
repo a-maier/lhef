@@ -437,6 +437,22 @@ impl<T: Write> Writer<T> {
         }
         self.ok_unless_failed()
     }
+
+    /// Determine the state of the writer
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    ///# use lhef::writer::WriterState;
+    /// let mut output = vec![];
+    /// let mut writer = lhef::Writer::new(
+    ///    std::io::Cursor::new(&mut output), "1.0"
+    /// ).unwrap();
+    /// assert_eq!(writer.state(), WriterState::ExpectingHeaderOrInit);
+    /// ```
+    pub fn state(&self) -> WriterState {
+        self.state
+    }
 }
 
 impl<T: Write> Drop for Writer<T> {

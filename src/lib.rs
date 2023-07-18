@@ -9,7 +9,7 @@
 //! specified in the LHEF standard.
 //!
 //! As of now, only [version 1.0](https://arxiv.org/abs/hep-ph/0609017) of
-//! the LHEF format</a> is fully supported. Files in [version
+//! the LHEF format is fully supported. Files in [version
 //! 2.0](http://www.lpthe.jussieu.fr/LesHouches09Wiki/index.php/LHEF_for_Matching)
 //! and [3.0](https://phystev.cnrs.fr/wiki/2013:groups:tools:lhef3) are
 //! parsed exactly like for version 1.0. This means that the additional XML

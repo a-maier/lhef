@@ -34,7 +34,7 @@ pub struct HEPRUP {
     pub LPRUP: Vec<i32>,
     /// Optional run information
     pub info: String,
-    /// Attributes in <init> tag
+    /// Attributes in `<init>` tag
     pub attr: XmlAttr,
 }
 
@@ -73,7 +73,7 @@ pub struct HEPEUP {
     pub SPINUP: Vec<f64>,
     /// Optional event information
     pub info: String,
-    /// Attributes in <event> tag
+    /// Attributes in `<event>` tag
     pub attr: XmlAttr,
 }
 
