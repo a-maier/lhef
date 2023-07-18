@@ -1,3 +1,8 @@
+# Version 0.6.0
+
+- Added `state` method to `Writer`
+- Fixes to documentation
+
 # Version 0.5.0
 
 - Made `ReaderData`, `ReadError`, and `WriteError` public
