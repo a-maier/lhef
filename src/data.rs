@@ -3,7 +3,7 @@ use std::collections::HashMap;
 pub type XmlAttr = HashMap<String, String>;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Generator run information
 ///

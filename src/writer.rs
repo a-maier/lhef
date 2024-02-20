@@ -11,7 +11,7 @@ use itertools::izip;
 use thiserror::Error;
 
 #[cfg(feature = "serde")]
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Writer for the LHEF format
 ///
